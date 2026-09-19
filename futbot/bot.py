@@ -34,12 +34,37 @@ class FutBot(commands.Bot):
 
     async def on_ready(self) -> None:
         logger.info("Logged in as %s (%s)", self.user, self.user.id if self.user else "?")
+        if self.user:
+            invite = discord.utils.oauth_url(
+                self.user.id,
+                permissions=discord.Permissions(
+                    send_messages=True,
+                    embed_links=True,
+                    attach_files=True,
+                    read_message_history=True,
+                    add_reactions=True,
+                    use_application_commands=True,
+                ),
+                scopes=("bot", "applications.commands"),
+            )
+            logger.info("Invite URL: %s", invite)
+        guilds = list(self.guilds)
+        if guilds:
+            logger.info("Connected to %s guild(s): %s", len(guilds), ", ".join(g.name for g in guilds))
+        else:
+            logger.warning("Bot is not in any Discord server yet. Use the invite URL above.")
         await self.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
                 name="EA FC 27 Markt",
             )
         )
+
+    async def on_guild_join(self, guild: discord.Guild) -> None:
+        logger.info("Joined guild %s (%s) — syncing slash commands", guild.name, guild.id)
+        self.tree.copy_global_to(guild=guild)
+        synced = await self.tree.sync(guild=guild)
+        logger.info("Synced %s commands to %s", len(synced), guild.name)
 
     async def close(self) -> None:
         await self.market.aclose()
