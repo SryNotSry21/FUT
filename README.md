@@ -12,6 +12,7 @@ Du kannst den Scanner **marktweit automatisch** laufen lassen und denselben Aler
 - Automatischer Markt-Scan: starke Pumps/Crashes ins Alert-Channel posten
 - `/watch`: Alert fest auf eine bestimmte Karte legen (eigene %- oder Coin-Schwelle)
 - `/alert`: denselben Alert sofort manuell auslösen, ohne auf die Schwelle zu warten
+- `/schnappchen`: Karten, die deutlich **unter dem anderen Plattform-Preis** oder unter dem **letzten Scan** liegen
 
 Datenquelle ist [FUT.GG](https://www.fut.gg) (Suche, Momentum, CDN-Preisblobs). FUTBIN-Suche ist als optionaler Fallback verdrahtet, wird aber von Cloudflare oft blockiert.
 
@@ -30,6 +31,7 @@ Der Bot loggt sich **nicht** in EA-Accounts ein und handelt nicht auf dem Transf
 | `/watches` | Alle manuellen Alerts des Servers |
 | `/alert` | Alert für eine Karte **jetzt** senden |
 | `/markt` | Momentum der letzten Stunden |
+| `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan) |
 | `/hilfe` | Kurzanleitung |
 
 Typischer Ablauf:
@@ -81,6 +83,7 @@ Nützlich zum Testen der Markt-APIs:
 python -m futbot lookup "Mbappe"
 python -m futbot compare "Mbappe" "Haaland"
 python -m futbot movers --stunden 24
+python -m futbot deals --min-prozent 20 --min-preis 15000
 ```
 
 ## Konfiguration

@@ -60,6 +60,19 @@ async def cmd_movers(game_year: int, hours: int) -> None:
         await market.aclose()
 
 
+async def cmd_deals(game_year: int, min_pct: float, min_price: int) -> None:
+    from futbot.formatting import format_bargain_line
+
+    market = MarketService(game_year=game_year)
+    try:
+        deals = await market.platform_bargains(min_price=min_price, min_pct=min_pct, limit=12)
+        print(f"Plattform-Schnäppchen · {len(deals)} Karten")
+        for deal in deals:
+            print("-", format_bargain_line(deal).replace("**", ""))
+    finally:
+        await market.aclose()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="EA FC 27 Markt-Bot von 21Drehen")
     sub = parser.add_subparsers(dest="command")
@@ -70,6 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("spieler2")
     movers = sub.add_parser("movers", help="Markt-Momentum anzeigen")
     movers.add_argument("--stunden", type=int, default=24)
+    deals = sub.add_parser("deals", help="Karten unter Marktwert (PS vs PC)")
+    deals.add_argument("--min-prozent", type=float, default=20.0)
+    deals.add_argument("--min-preis", type=int, default=15_000)
     sub.add_parser("bot", help="Discord-Bot starten")
     return parser
 
@@ -85,6 +101,8 @@ def main(argv: list[str] | None = None) -> None:
         asyncio.run(cmd_compare(args.spieler1, args.spieler2, settings.game_year))
     elif command == "movers":
         asyncio.run(cmd_movers(settings.game_year, args.stunden))
+    elif command == "deals":
+        asyncio.run(cmd_deals(settings.game_year, args.min_prozent, args.min_preis))
     elif command == "bot":
         from futbot.bot import main as run_bot
 

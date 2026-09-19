@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from futbot.market.models import Bargain, Platform
+
 
 def percent_change(old: int, new: int) -> float:
     if old <= 0:
@@ -55,3 +57,74 @@ def rank_movers(
     risers.sort(key=lambda item: item[3], reverse=True)
     fallers.sort(key=lambda item: item[3])
     return risers[:limit], fallers[:limit]
+
+
+# EA range-max placeholders (e.g. 15.000.000) are not real BINs.
+MAX_REALISTIC_BIN = 12_000_000
+
+
+def rank_platform_bargains(
+    ps5: dict[int, int],
+    pc: dict[int, int],
+    *,
+    min_price: int = 15_000,
+    min_pct: float = 20.0,
+    min_delta: int = 20_000,
+    max_price: int = MAX_REALISTIC_BIN,
+    max_ratio: float = 5.0,
+    limit: int = 10,
+) -> list[Bargain]:
+    """Cards whose BIN on one platform is well below the other platform's BIN."""
+    found: list[Bargain] = []
+    for ea_id, ps_price in ps5.items():
+        pc_price = pc.get(ea_id)
+        if pc_price is None:
+            continue
+        cheap_price = min(ps_price, pc_price)
+        fair_price = max(ps_price, pc_price)
+        if cheap_price < min_price or fair_price > max_price:
+            continue
+        if fair_price <= 0 or cheap_price <= 0:
+            continue
+        if fair_price / cheap_price > max_ratio:
+            continue
+        delta = fair_price - cheap_price
+        pct_below = (delta / fair_price) * 100.0
+        if pct_below < min_pct or delta < min_delta:
+            continue
+        cheap_platform: Platform = "ps5" if ps_price <= pc_price else "pc"
+        fair_platform: Platform = "pc" if cheap_platform == "ps5" else "ps5"
+        found.append(
+            Bargain(
+                ea_id=ea_id,
+                cheap_platform=cheap_platform,
+                cheap_price=cheap_price,
+                fair_platform=fair_platform,
+                fair_price=fair_price,
+                pct_below=pct_below,
+                reason="plattform",
+            )
+        )
+    found.sort(key=lambda item: item.pct_below, reverse=True)
+    return found[:limit]
+
+
+def bargains_from_drops(
+    fallers: list[tuple[int, int, int, float]],
+    platform: Platform,
+) -> list[Bargain]:
+    """Turn snapshot crashes into 'below recent market' bargains."""
+    bargains: list[Bargain] = []
+    for ea_id, old_price, new_price, pct in fallers:
+        bargains.append(
+            Bargain(
+                ea_id=ea_id,
+                cheap_platform=platform,
+                cheap_price=new_price,
+                fair_platform=platform,
+                fair_price=old_price,
+                pct_below=abs(pct),
+                reason="markt",
+            )
+        )
+    return bargains

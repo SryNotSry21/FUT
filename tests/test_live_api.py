@@ -83,6 +83,21 @@ async def test_live_player_lookup_returns_names() -> None:
 
 
 @pytest.mark.asyncio
+async def test_live_platform_bargains_have_names() -> None:
+    market = MarketService(game_year=27)
+    try:
+        deals = await market.platform_bargains(min_price=20_000, min_pct=25, limit=5)
+    except Exception as exc:
+        pytest.skip(f"FUT.GG not reachable: {exc}")
+    finally:
+        await market.aclose()
+    if not deals:
+        pytest.skip("no platform bargains at the current thresholds")
+    assert all(deal.player and deal.player.name != "Unbekannt" for deal in deals)
+    assert all(deal.cheap_price < deal.fair_price for deal in deals)
+
+
+@pytest.mark.asyncio
 async def test_live_momentum_contains_prices() -> None:
     client = FutGGClient(game_year=27)
     try:

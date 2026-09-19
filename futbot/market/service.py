@@ -5,10 +5,10 @@ import time
 from collections.abc import Sequence
 from dataclasses import replace
 
-from futbot.market.compare import is_significant_move, rank_movers
+from futbot.market.compare import bargains_from_drops, is_significant_move, rank_movers, rank_platform_bargains
 from futbot.market.futbin import FutbinClient
 from futbot.market.futgg import FutGGClient
-from futbot.market.models import PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
+from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
 
 
 class MarketService:
@@ -157,6 +157,50 @@ class MarketService:
         await self.hydrate_moves(risers)
         await self.hydrate_moves(fallers)
         return risers, fallers
+
+    async def hydrate_bargains(self, bargains: list[Bargain]) -> None:
+        missing_ids = [deal.ea_id for deal in bargains if deal.player is None]
+        if not missing_ids:
+            return
+        cards = await self.players_by_ids(missing_ids)
+        for index, deal in enumerate(bargains):
+            card = deal.player or cards.get(deal.ea_id)
+            if card is not None and deal.player is None:
+                bargains[index] = replace(deal, player=card)
+
+    async def platform_bargains(
+        self,
+        min_price: int = 15_000,
+        min_pct: float = 20.0,
+        limit: int = 8,
+    ) -> list[Bargain]:
+        catalog = await self.catalog()
+        deals = rank_platform_bargains(
+            catalog.snapshot("ps5"),
+            catalog.snapshot("pc"),
+            min_price=min_price,
+            min_pct=min_pct,
+            limit=limit,
+        )
+        await self.hydrate_bargains(deals)
+        return deals
+
+    async def below_recent_bargains(
+        self,
+        previous: dict[int, int],
+        platform: Platform,
+        min_price: int = 15_000,
+        min_pct: float = 15.0,
+        limit: int = 8,
+    ) -> list[Bargain]:
+        catalog = await self.catalog()
+        current = catalog.snapshot(platform)
+        _risers, fallers = rank_movers(
+            previous, current, threshold_pct=min_pct, min_price=min_price, limit=limit
+        )
+        deals = bargains_from_drops(fallers, platform)
+        await self.hydrate_bargains(deals)
+        return deals
 
     def watch_move(
         self,

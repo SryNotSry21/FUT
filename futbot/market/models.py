@@ -5,6 +5,7 @@ from typing import Literal
 
 Platform = Literal["ps5", "pc"]
 WatchPlatform = Literal["ps5", "pc", "beide"]
+BargainReason = Literal["plattform", "markt"]
 
 STATUS_ON_MARKET = 0
 STATUS_SBC = 1
@@ -73,6 +74,24 @@ class PriceMove:
     @property
     def is_drop(self) -> bool:
         return self.delta < 0
+
+
+@dataclass(frozen=True)
+class Bargain:
+    """Card priced below a fair reference (other platform or recent BIN)."""
+
+    ea_id: int
+    cheap_platform: Platform
+    cheap_price: int
+    fair_platform: Platform
+    fair_price: int
+    pct_below: float
+    reason: BargainReason
+    player: PlayerCard | None = None
+
+    @property
+    def delta(self) -> int:
+        return self.cheap_price - self.fair_price
 
 
 @dataclass

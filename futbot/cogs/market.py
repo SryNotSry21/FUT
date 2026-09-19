@@ -12,6 +12,7 @@ from futbot.branding import HELP_TITLE
 from futbot.config import Settings
 from futbot.db import Store, Watch
 from futbot.formatting import (
+    bargains_embed,
     compare_embed,
     format_coins,
     format_pct,
@@ -407,6 +408,46 @@ class MarketCog(commands.Cog):
                 drops[:8],
                 extra_lines=["Quelle: FUT.GG Momentum-API, angereichert mit Live-Preisblob."],
             )
+            )
+
+    @app_commands.command(
+        name="schnappchen",
+        description="Karten unter Marktwert: günstiger als die andere Plattform oder unter dem letzten Preis",
+    )
+    @app_commands.describe(
+        min_prozent="Mindest-Abstand zum Vergleichspreis",
+        min_preis="Mindestpreis der günstigen Seite",
+    )
+    async def schnappchen(
+        self,
+        interaction: discord.Interaction,
+        min_prozent: app_commands.Range[float, 10, 80] = 20.0,
+        min_preis: app_commands.Range[int, 1000, 500_000] = 15_000,
+    ) -> None:
+        await interaction.response.defer()
+        platform_deals = await self.market.platform_bargains(
+            min_price=int(min_preis),
+            min_pct=float(min_prozent),
+            limit=8,
+        )
+        previous = self.store.load_snapshot("ps5")
+        market_deals = await self.market.below_recent_bargains(
+            previous,
+            "ps5",
+            min_price=int(min_preis),
+            min_pct=float(min_prozent),
+            limit=8,
+        )
+        await interaction.followup.send(
+            embed=bargains_embed(
+                platform_deals,
+                market_deals,
+                extra_lines=[
+                    "Kein EA-Transfermarkt — einzelne unter Preis gelistete Auktionen sieht der Bot nicht.",
+                    "Vergleich: FUT.GG-BIN vs. andere Plattform bzw. letzter Scan.",
+                    f"Schwelle {format_pct(float(min_prozent))} · ab {format_coins(int(min_preis))}",
+                ],
+            )
         )
 
     @app_commands.command(name="setup", description="Alert-Kanal und automatischen Markt-Scan konfigurieren")
@@ -463,6 +504,7 @@ class MarketCog(commands.Cog):
                 "`/watches` Liste der manuellen Alerts\n"
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
+                "`/schnappchen` unter Marktwert / günstige Plattform\n"
                 "`/setup` Alert-Kanal (Admin)"
             ),
             inline=False,

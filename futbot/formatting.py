@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import discord
 
 from futbot.branding import FOOTER
-from futbot.market.models import PlayerCard, PlayerQuote, Platform, PriceMove
+from futbot.market.models import Bargain, PlayerCard, PlayerQuote, PriceMove
 
 BRAND_COLOR = 0x2ECC71
 DROP_COLOR = 0xE74C3C
@@ -137,6 +137,37 @@ def movers_embed(
     return embed
 
 
+def bargains_embed(
+    platform_deals: list[Bargain],
+    market_deals: list[Bargain],
+    extra_lines: list[str] | None = None,
+) -> discord.Embed:
+    embed = discord.Embed(
+        title="Unter Marktwert",
+        color=NEUTRAL_COLOR,
+        timestamp=datetime.now(timezone.utc),
+        description="\n".join(
+            extra_lines
+            or [
+                "Kein EA-Transfermarkt — keine einzelnen Snipes.",
+                "Vergleich: FUT.GG-Preis vs. andere Plattform bzw. letzter Scan.",
+            ]
+        ),
+    )
+    embed.add_field(
+        name="Günstiger als die andere Plattform",
+        value=_bargain_list(platform_deals) or "Keine",
+        inline=False,
+    )
+    embed.add_field(
+        name="Unter dem letzten Marktpreis",
+        value=_bargain_list(market_deals) or "Keine",
+        inline=False,
+    )
+    embed.set_footer(text=FOOTER)
+    return embed
+
+
 def search_embed(query: str, cards: list[PlayerCard]) -> discord.Embed:
     embed = discord.Embed(
         title=f"Suche: {query}",
@@ -201,3 +232,25 @@ def _move_list(moves: list[PriceMove]) -> str:
     for move in moves[:8]:
         lines.append(f"**{move_display_name(move)}** {format_price_path(move)}")
     return "\n".join(lines)
+
+
+def bargain_display_name(deal: Bargain) -> str:
+    if deal.player and deal.player.name and deal.player.name != "Unbekannt":
+        return deal.player.label
+    return f"ID {deal.ea_id}"
+
+
+def format_bargain_line(deal: Bargain) -> str:
+    cheap_label = "PS" if deal.cheap_platform == "ps5" else "PC"
+    fair_label = "PS" if deal.fair_platform == "ps5" else "PC"
+    path = (
+        f"▼ {format_coin_amount(deal.fair_price)} → {format_coin_amount(deal.cheap_price)} Coins "
+        f"({format_pct(-deal.pct_below)})"
+    )
+    if deal.reason == "plattform":
+        return f"**{bargain_display_name(deal)}** {path} · günstig auf {cheap_label} (vs {fair_label})"
+    return f"**{bargain_display_name(deal)}** {path}"
+
+
+def _bargain_list(deals: list[Bargain]) -> str:
+    return "\n".join(format_bargain_line(deal) for deal in deals[:8])
