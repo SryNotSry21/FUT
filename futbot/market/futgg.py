@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 from typing import Any
 
 import httpx
 
 from futbot.market.models import PlayerCard, PriceCatalog
-from futbot.market.parse import parse_global_search_hit, parse_player_card
+from futbot.market.parse import cards_from_payload, first_matching_card, parse_global_search_hit, parse_player_card
 from futbot.market.prices import decode_platform_prices, merge_price_blobs
 
 logger = logging.getLogger(__name__)
@@ -67,16 +68,48 @@ class FutGGClient:
         return parsed[:limit]
 
     async def get_player(self, ea_id: int) -> PlayerCard | None:
+        found = await self.get_players([ea_id])
+        return found.get(int(ea_id))
+
+    async def get_players(self, ea_ids: Sequence[int]) -> dict[int, PlayerCard]:
+        wanted = list(dict.fromkeys(int(ea_id) for ea_id in ea_ids))
+        found: dict[int, PlayerCard] = {}
+        if not wanted:
+            return found
+        chunk_size = 40
+        for offset in range(0, len(wanted), chunk_size):
+            chunk = wanted[offset : offset + chunk_size]
+            ids = ",".join(str(ea_id) for ea_id in chunk)
+            try:
+                payload = await self._get_json(
+                    f"{SITE}/api/fut/{self.game_year}/player-items/",
+                    params={"ids": ids},
+                )
+            except (httpx.HTTPError, ValueError):
+                logger.warning("Bulk player-items lookup failed for %s ids", len(chunk), exc_info=True)
+            else:
+                for card in cards_from_payload(payload):
+                    found[card.ea_id] = card
+            for ea_id in chunk:
+                if ea_id in found:
+                    continue
+                card = await self._lookup_single_player(ea_id)
+                if card:
+                    found[ea_id] = card
+        return found
+
+    async def _lookup_single_player(self, ea_id: int) -> PlayerCard | None:
         for url, params in (
             (f"{SITE}/api/fut/players/v2/hub/{ea_id}/", {"game": self.game_year}),
             (f"{SITE}/api/fut/{self.game_year}/player-items/", {"ids": ea_id}),
+            (f"{SITE}/api/fut/players/v2/{self.game_year}/", {"ids": ea_id}),
             (f"{SITE}/api/fut/players/v2/{self.game_year}/", {"eaId": ea_id}),
         ):
             try:
                 payload = await self._get_json(url, params=params)
-            except httpx.HTTPError:
+            except (httpx.HTTPError, ValueError):
                 continue
-            card = _first_matching_card(payload, ea_id)
+            card = first_matching_card(payload, ea_id)
             if card:
                 return card
         return None
@@ -132,6 +165,8 @@ class FutGGClient:
         response = await self._client.get(url, params=params)
         response.raise_for_status()
         payload = response.json()
+        if isinstance(payload, list):
+            return {"data": payload}
         if not isinstance(payload, dict):
             raise ValueError(f"Unexpected JSON from {url}")
         return payload
@@ -142,19 +177,4 @@ def reconstruct_len(index: dict[str, Any]) -> int:
 
 
 def _first_matching_card(payload: dict[str, Any], ea_id: int) -> PlayerCard | None:
-    candidates: list[Any] = []
-    if isinstance(payload.get("data"), list):
-        candidates.extend(payload["data"])
-    elif isinstance(payload.get("data"), dict):
-        data = payload["data"]
-        candidates.extend(data.get("playerItems") or data.get("items") or [])
-        if "eaId" in data:
-            candidates.append(data)
-    for item in candidates:
-        if isinstance(item, dict) and int(item.get("eaId") or 0) == ea_id:
-            return parse_player_card(item)
-        if isinstance(item, dict) and "player" in item:
-            nested = item["player"]
-            if isinstance(nested, dict) and int(nested.get("eaId") or 0) == ea_id:
-                return parse_player_card(nested)
-    return None
+    return first_matching_card(payload, ea_id)

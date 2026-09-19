@@ -1,4 +1,4 @@
-from futbot.market.parse import parse_global_search_hit, parse_player_card
+from futbot.market.parse import cards_from_payload, first_matching_card, parse_global_search_hit, parse_player_card
 
 
 MBAPPE = {
@@ -49,3 +49,38 @@ def test_parse_global_search_hit() -> None:
     assert card is not None
     assert card.ea_id == 231747
     assert card.name == "Kylian Mbappé"
+
+
+def test_hub_current_versions_are_parsed() -> None:
+    payload = {
+        "data": {
+            "basePlayerEaId": 231747,
+            "basePlayerName": "Kylian Mbappé",
+            "currentVersions": [MBAPPE],
+        }
+    }
+    card = first_matching_card(payload, 231747)
+    assert card is not None
+    assert card.name == "Kylian Mbappé"
+    assert card.rating == 91
+
+
+def test_player_items_wrapper_payload() -> None:
+    payload = {"extraData": {}, "data": [MBAPPE], "totalCount": 1}
+    cards = cards_from_payload(payload)
+    assert len(cards) == 1
+    assert cards[0].ea_id == 231747
+    assert cards[0].name == "Kylian Mbappé"
+
+
+def test_name_falls_back_to_first_and_last() -> None:
+    card = parse_player_card(
+        {
+            "eaId": 238794,
+            "overall": 89,
+            "firstName": "Vinícius",
+            "lastName": "Júnior",
+            "position": "LW",
+        }
+    )
+    assert card.name == "Vinícius Júnior"

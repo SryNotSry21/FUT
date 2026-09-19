@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Sequence
+from dataclasses import replace
 
 from futbot.market.compare import is_significant_move, rank_movers
 from futbot.market.futbin import FutbinClient
@@ -31,13 +33,35 @@ class MarketService:
         return cards
 
     async def player_by_id(self, ea_id: int) -> PlayerCard | None:
-        cached = self._players.get(ea_id)
-        if cached:
-            return cached
-        card = await self.futgg.get_player(ea_id)
-        if card:
-            self._players[ea_id] = card
-        return card
+        found = await self.players_by_ids([ea_id])
+        return found.get(int(ea_id))
+
+    async def players_by_ids(self, ea_ids: Sequence[int]) -> dict[int, PlayerCard]:
+        unique = list(dict.fromkeys(int(ea_id) for ea_id in ea_ids))
+        result: dict[int, PlayerCard] = {}
+        missing: list[int] = []
+        for ea_id in unique:
+            cached = self._players.get(ea_id)
+            if cached:
+                result[ea_id] = cached
+            else:
+                missing.append(ea_id)
+        if missing:
+            fetched = await self.futgg.get_players(missing)
+            for ea_id, card in fetched.items():
+                self._players[ea_id] = card
+                result[ea_id] = card
+        return result
+
+    async def hydrate_moves(self, moves: list[PriceMove]) -> None:
+        missing_ids = [move.ea_id for move in moves if move.player is None]
+        if not missing_ids:
+            return
+        cards = await self.players_by_ids(missing_ids)
+        for index, move in enumerate(moves):
+            card = move.player or cards.get(move.ea_id)
+            if card is not None and move.player is None:
+                moves[index] = replace(move, player=card)
 
     async def resolve(self, query: str) -> PlayerCard | None:
         query = query.strip()
@@ -124,13 +148,15 @@ class MarketService:
     ) -> tuple[list[PriceMove], list[PriceMove]]:
         catalog = await self.catalog()
         current = catalog.snapshot(platform)
-        risers, fallers = rank_movers(
+        ranked_up, ranked_down = rank_movers(
             previous, current, threshold_pct=threshold_pct, min_price=min_price, limit=limit
         )
-        return (
-            [self._to_move(ea_id, old, new, pct, platform) for ea_id, old, new, pct in risers],
-            [self._to_move(ea_id, old, new, pct, platform) for ea_id, old, new, pct in fallers],
-        )
+        risers = [self._to_move(ea_id, old, new, pct, platform) for ea_id, old, new, pct in ranked_up]
+        fallers = [self._to_move(ea_id, old, new, pct, platform) for ea_id, old, new, pct in ranked_down]
+        await self.players_by_ids([move.ea_id for move in risers + fallers])
+        await self.hydrate_moves(risers)
+        await self.hydrate_moves(fallers)
+        return risers, fallers
 
     def watch_move(
         self,
@@ -167,4 +193,5 @@ class MarketService:
             new_price=new,
             delta=new - old,
             pct=pct,
+            player=self._players.get(ea_id),
         )

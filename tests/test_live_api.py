@@ -60,6 +60,29 @@ async def test_live_market_service_quote() -> None:
 
 
 @pytest.mark.asyncio
+async def test_live_player_lookup_returns_names() -> None:
+    client = FutGGClient(game_year=27)
+    try:
+        cards = await client.get_players([231747, 238794])
+        hub = await client._get_json(
+            "https://www.fut.gg/api/fut/players/v2/hub/231747/",
+            params={"game": 27},
+        )
+    except Exception as exc:
+        pytest.skip(f"FUT.GG not reachable: {exc}")
+    finally:
+        await client.aclose()
+    from futbot.market.parse import first_matching_card
+
+    assert cards[231747].name == "Kylian Mbappé"
+    assert cards[238794].name
+    assert "ID " not in cards[231747].name
+    hub_card = first_matching_card(hub, 231747)
+    assert hub_card is not None
+    assert hub_card.name == "Kylian Mbappé"
+
+
+@pytest.mark.asyncio
 async def test_live_momentum_contains_prices() -> None:
     client = FutGGClient(game_year=27)
     try:

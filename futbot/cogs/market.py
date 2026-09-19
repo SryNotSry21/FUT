@@ -506,6 +506,7 @@ class MarketCog(commands.Cog):
             quote = catalog.quote(watch.as_player())
             moves = self._watch_moves(watch, quote.ps5.price, quote.pc.price, settings.cooldown_minutes, now)
             if moves:
+                await self._hydrate_moves(moves)
                 channel = await self._alert_channel(guild)
                 if channel:
                     for move in moves:
@@ -538,7 +539,8 @@ class MarketCog(commands.Cog):
                 )
                 if risers or fallers:
                     watched_ids = {watch.ea_id for watch in self.store.list_watches(settings.guild_id)}
-                    await self._hydrate_moves(risers + fallers)
+                    await self._hydrate_moves(risers)
+                    await self._hydrate_moves(fallers)
                     channel = await self._alert_channel(guild)
                     if channel:
                         auto_risers = [m for m in risers if m.ea_id not in watched_ids]
@@ -578,6 +580,8 @@ class MarketCog(commands.Cog):
         if watch.platform in ("pc", "beide"):
             platforms.append(("pc", watch.last_price_pc, pc_price))
         moves: list[PriceMove] = []
+        stored = watch.as_player()
+        player = None if not watch.name or watch.name in {"Unbekannt", str(watch.ea_id)} else stored
         for platform, old, new in platforms:
             move = self.market.watch_move(
                 watch.ea_id,
@@ -586,25 +590,14 @@ class MarketCog(commands.Cog):
                 new,
                 watch.threshold_pct,
                 watch.threshold_coins,
-                player=watch.as_player(),
+                player=player,
             )
             if move:
                 moves.append(move)
         return moves
 
     async def _hydrate_moves(self, moves: list[PriceMove]) -> None:
-        for index, move in enumerate(moves):
-            card = await self.market.player_by_id(move.ea_id)
-            if card:
-                moves[index] = PriceMove(
-                    ea_id=move.ea_id,
-                    platform=move.platform,
-                    old_price=move.old_price,
-                    new_price=move.new_price,
-                    delta=move.delta,
-                    pct=move.pct,
-                    player=card,
-                )
+        await self.market.hydrate_moves(moves)
 
 
 async def setup(bot: commands.Bot) -> None:

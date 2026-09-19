@@ -78,7 +78,8 @@ def move_embed(move: PriceMove, reason: str, mention: str | None = None) -> disc
     player = move.player
     title = "Preis-Alert"
     if player:
-        title = f"{'Crash' if move.is_drop else 'Pump'}: {player.name}"
+        shown = move_display_name(move)
+        title = f"{'Crash' if move.is_drop else 'Pump'}: {player.name if player.name != 'Unbekannt' else shown}"
     color = DROP_COLOR if move.is_drop else RISE_COLOR
     description = reason
     if mention:
@@ -173,9 +174,19 @@ def _diff(left: int | None, right: int | None) -> str:
     return format_delta(delta, pct)
 
 
+def move_display_name(move: PriceMove) -> str:
+    player = move.player
+    if player and player.name and player.name != "Unbekannt":
+        return player.label
+    if player and player.name:
+        return f"{player.name} · {player.rating} {player.position}".strip()
+    return f"ID {move.ea_id}"
+
+
 def _move_list(moves: list[PriceMove]) -> str:
     lines = []
     for move in moves[:8]:
-        name = move.player.label if move.player else f"ID {move.ea_id}"
-        lines.append(f"**{name}** {format_delta(move.delta, move.pct)} → {format_coins(move.new_price)}")
+        lines.append(
+            f"**{move_display_name(move)}** {format_delta(move.delta, move.pct)} → {format_coins(move.new_price)}"
+        )
     return "\n".join(lines)
