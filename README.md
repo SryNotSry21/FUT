@@ -46,6 +46,10 @@ Typischer Ablauf:
 2. Bot-User erstellen, Token kopieren.
 3. OAuth2-Invite mit den Scopes `bot` und `applications.commands`.
 4. Rechte: Nachrichten senden, Embeds, Slash-Commands. Keine Message-Content-Intent nötig.
+5. Unter **App information → Legal** diese öffentlichen URLs eintragen:
+
+   - Terms of Service: `https://github.com/SryNotSry21/FUT/blob/main/TERMS.md`
+   - Privacy Policy: `https://github.com/SryNotSry21/FUT/blob/main/PRIVACY.md`
 
 ### 2. Bot starten
 
@@ -98,6 +102,11 @@ python -m pytest
 ```
 
 Die Live-Tests treffen die echten FUT.GG-Endpunkte und werden übersprungen, wenn das Netz sie blockt.
+
+## Rechtliches
+
+- [Nutzungsbedingungen / Terms of Service](TERMS.md)
+- [Datenschutzerklärung / Privacy Policy](PRIVACY.md)
 
 ## APIs
 
