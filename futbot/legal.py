@@ -1,4 +1,4 @@
-"""Legal texts shown in Discord and linked from the Developer Portal."""
+"""Legal texts shown in Discord (privacy, server setup)."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 import discord
 
-from futbot.branding import BOT_NAME, FOOTER
+from futbot.branding import BOT_NAME, COPYRIGHT, FOOTER, INVITE_URL
 
 PRIVACY_TITLE = "Datenschutzerklärung"
 PRIVACY_UPDATED = "19. September 2026"
@@ -74,4 +74,59 @@ def privacy_embed() -> discord.Embed:
         inline=False,
     )
     embed.set_footer(text=FOOTER)
+    return embed
+
+
+def setup_guide_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title=f"Einrichten — {BOT_NAME}",
+        color=0x2ECC71,
+        timestamp=datetime.now(timezone.utc),
+        description=(
+            "So nutzt du **diesen** Bot auf deinem Discord-Server. "
+            "Du musst keinen eigenen Bot anlegen."
+        ),
+    )
+    embed.add_field(
+        name="1. Bot einladen",
+        value=(
+            "Du brauchst die Berechtigung **Server verwalten**.\n"
+            f"[Bot einladen]({INVITE_URL})"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="2. Channel vorbereiten",
+        value=(
+            "Lege einen Textkanal für Markt-Alerts an (z. B. `#markt-alerts`). "
+            "Der Bot braucht dort: Nachrichten senden, Links einbetten, Slash-Befehle."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="3. `/setup` ausführen",
+        value=(
+            "`/setup kanal:#markt-alerts schwelle:10 auto_scan:True min_preis:10000`\n"
+            "• **kanal** — wohin Alerts gehen\n"
+            "• **schwelle** — ab wie viel Prozent Preisänderung (z. B. 10)\n"
+            "• **auto_scan** — marktweite Pumps/Crashes automatisch posten\n"
+            "• **min_preis** — günstige Karten darunter ignorieren"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="4. Optional: eigene Karten",
+        value=(
+            "• `/watch` — Alert bei starker %-Änderung\n"
+            "• `/beobachten unter:2000000` — Alert, wenn der Preis unter deinen Zielwert fällt\n"
+            "• `/schnappchen` — aktuell günstiger als die andere Plattform"
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Hilfe",
+        value="`/hilfe` alle Befehle · `/datenschutz` Daten · Diesen Bot nicht nachbauen oder kopieren.",
+        inline=False,
+    )
+    embed.set_footer(text=f"{FOOTER} · {COPYRIGHT}")
     return embed

@@ -5,11 +5,12 @@ import logging
 import discord
 from discord.ext import commands
 
-from futbot.branding import BOT_ACTIVITY, BOT_NAME, BOT_USERNAME_FALLBACK
+from futbot.branding import BOT_ACTIVITY, BOT_NAME, BOT_USERNAME_FALLBACK, COPYRIGHT
 from futbot.config import Settings, load_settings
 from futbot.cogs.market import MarketCog
 from futbot.db import Store
 from futbot.market.service import MarketService
+from futbot.ownership import UNOFFICIAL_COPY_MESSAGE, ensure_official_instance
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,16 @@ class FutBot(commands.Bot):
 
     async def on_ready(self) -> None:
         logger.info("Logged in as %s (%s)", self.user, self.user.id if self.user else "?")
+        logger.info("%s", COPYRIGHT)
+        try:
+            ensure_official_instance(
+                self.settings.discord_token,
+                user_id=self.user.id if self.user else None,
+            )
+        except PermissionError:
+            logger.error(UNOFFICIAL_COPY_MESSAGE)
+            await self.close()
+            return
         if self.user:
             invite = discord.utils.oauth_url(
                 self.user.id,
@@ -116,7 +127,12 @@ def main() -> None:
     settings = load_settings()
     if not settings.discord_token:
         raise SystemExit(
-            "DISCORD_TOKEN fehlt. Kopiere .env.example nach .env und setze den Bot-Token."
+            "DISCORD_TOKEN der offiziellen Instanz fehlt. "
+            "Keine eigene Discord-Anwendung anlegen — siehe LICENSE."
         )
+    try:
+        ensure_official_instance(settings.discord_token)
+    except PermissionError as exc:
+        raise SystemExit(str(exc)) from exc
     bot = build_bot(settings)
     bot.run(settings.discord_token)

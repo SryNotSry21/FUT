@@ -1,128 +1,58 @@
 # EA FC 27 Markt-Bot von 21Drehen
 
-Discord-Bot, der den **EA FC 27 Ultimate Team**-Markt über öffentliche FUT.GG-API-Schnittstellen überwacht, Preise vergleicht und Alerts schickt, wenn sich eine Karte stark bewegt.
+Offizielle Discord-Anwendung von **21Drehen**. Der Bot prüft den EA-FC-27-Markt (Preise über FUT.GG), vergleicht sie und schickt Alerts bei starken Bewegungen.
 
-Du kannst den Scanner **marktweit automatisch** laufen lassen und denselben Alert **manuell auf einzelne Spieler** legen.
+Du musst **keinen eigenen Bot erstellen**. Einfach den offiziellen Bot einladen und auf dem Server einrichten.
 
-## Was der Bot kann
+© 2026 21Drehen. Alle Rechte vorbehalten. Kopieren oder Nachbauen ist nicht erlaubt. Siehe [LICENSE](LICENSE) und [Nutzungsbedingungen](TERMS.md).
 
-- Spieler über die FUT.GG-Suche finden (`/suche`, Autocomplete in den anderen Commands)
-- Live-Preise für **PlayStation/Konsole** und **PC** aus den FUT.GG-Preisblobs lesen
-- Zwei Karten vergleichen, inklusive PS-vs-PC-Spread
-- Automatischer Markt-Scan: starke Pumps/Crashes ins Alert-Channel posten
-- `/watch`: Alert fest auf eine bestimmte Karte legen (eigene %- oder Coin-Schwelle)
-- `/beobachten`: Alert, wenn der Preis **unter einen Zielwert** fällt
-- `/alert`: denselben Alert sofort manuell auslösen, ohne auf die Schwelle zu warten
-- `/schnappchen`: Karten, die deutlich **unter dem anderen Plattform-Preis** oder unter dem **letzten Scan** liegen
+## Einladen
 
-Datenquelle ist [FUT.GG](https://www.fut.gg) (Suche, Momentum, CDN-Preisblobs). FUTBIN-Suche ist als optionaler Fallback verdrahtet, wird aber von Cloudflare oft blockiert.
+Du brauchst auf dem Server **Server verwalten**.
 
-Der Bot loggt sich **nicht** in EA-Accounts ein und handelt nicht auf dem Transfermarkt.
+**[Bot einladen](https://discord.com/oauth2/authorize?client_id=1550876389849174016&scope=bot+applications.commands&permissions=2147600448)**
 
-## Discord-Befehle
+Rechte, die der Bot braucht: Nachrichten senden, Embeds, Slash-Befehle.
+
+## Einrichten auf dem Server
+
+1. Textkanal für Alerts anlegen, z. B. `#markt-alerts`.
+2. Als Admin ausführen:
+
+   `/setup kanal:#markt-alerts schwelle:10 auto_scan:True min_preis:10000`
+
+3. Danach postet der Bot starke Marktbewegungen in diesen Kanal.
+4. Optional eigene Karten:
+
+   - `/watch spieler:Mbappé schwelle_prozent:8` — Alert bei %-Änderung
+   - `/beobachten spieler:Mbappé unter:2000000` — Alert unter Zielpreis
+
+Ausführlich in Discord: **`/einrichten`**. Alle Befehle: **`/hilfe`**. Datenschutz: **`/datenschutz`**.
+
+## Befehle
 
 | Command | Funktion |
 |---|---|
-| `/setup` | Alert-Kanal, Auto-Scan und Standard-Schwelle (Admin) |
-| `/preis` | Aktuellen PS- und PC-Preis einer Karte |
+| `/einrichten` | Setup-Erklärung für diesen Server |
+| `/setup` | Alert-Kanal, Auto-Scan und Schwelle (Admin) |
+| `/preis` | Aktuellen PS- und PC-Preis |
 | `/suche` | Spieler suchen |
 | `/vergleichen` | Zwei Karten vergleichen |
-| `/watch` | Manuellen Alert für eine Karte setzen |
-| `/beobachten` | Alert, wenn der Preis unter einen Zielwert fällt |
-| `/unwatch` | Manuellen Alert entfernen |
-| `/watches` | Alle manuellen Alerts des Servers |
-| `/beobachtungen` | Beobachtungsliste (nur Zielpreis) |
-| `/alert` | Alert für eine Karte **jetzt** senden |
+| `/watch` | Alert bei %-Änderung |
+| `/beobachten` | Alert unter Zielpreis |
+| `/unwatch` | Alert entfernen |
+| `/watches` | Alle manuellen Alerts |
+| `/beobachtungen` | Nur Zielpreis-Beobachtungen |
+| `/alert` | Alert jetzt senden |
 | `/markt` | Momentum der letzten Stunden |
 | `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan) |
 | `/hilfe` | Kurzanleitung |
 | `/datenschutz` | Datenschutzerklärung |
 
-Typischer Ablauf:
-
-1. Bot einladen, in einem Channel `/setup kanal:#markt-alerts schwelle:10 auto_scan:True` ausführen.
-2. Danach scannt der Bot den Markt im Hintergrund und postet starke Bewegungen.
-3. Zusätzlich `/watch spieler:Mbappé schwelle_prozent:8` für Karten, die dir persönlich wichtig sind.
-4. Oder `/beobachten spieler:Mbappé unter:2000000` — Alert, sobald der Preis unter 2 Mio. fällt.
-
-## Setup
-
-### 1. Discord-Application
-
-1. Unter [Discord Developer Portal](https://discord.com/developers/applications) eine Application anlegen.
-2. Bot-User erstellen, Token kopieren.
-3. OAuth2-Invite mit den Scopes `bot` und `applications.commands`.
-4. Rechte: Nachrichten senden, Embeds, Slash-Commands. Keine Message-Content-Intent nötig.
-5. Unter **App information → Legal** öffentliche HTTPS-URLs eintragen (Discord muss die Seiten ohne Login öffnen können). Liegt das Repo öffentlich:
-
-   - Terms of Service: https://github.com/SryNotSry21/FUT/blob/main/TERMS.md
-   - Privacy Policy: https://github.com/SryNotSry21/FUT/blob/main/PRIVACY.md
-
-   Ist das Repo privat, dieselben Dateien `TERMS.md` und `PRIVACY.md` als öffentlichen Gist oder eine andere öffentliche Seite spiegeln und diese URLs eintragen.
-
-### 2. Bot starten
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# DISCORD_TOKEN in .env eintragen
-python -m futbot
-```
-
-Optional `DISCORD_GUILD_ID` setzen, damit Slash-Commands sofort auf deinem Server erscheinen (sonst globale Sync, bis zu einer Stunde).
-
-### Docker
-
-```bash
-cp .env.example .env
-docker compose up --build -d
-```
-
-## CLI ohne Discord
-
-Nützlich zum Testen der Markt-APIs:
-
-```bash
-python -m futbot lookup "Mbappe"
-python -m futbot compare "Mbappe" "Haaland"
-python -m futbot movers --stunden 24
-python -m futbot deals --min-prozent 20 --min-preis 15000
-```
-
-## Konfiguration
-
-| Variable | Default | Bedeutung |
-|---|---|---|
-| `DISCORD_TOKEN` | — | Bot-Token |
-| `DISCORD_GUILD_ID` | leer | Slash-Commands nur auf diesen Server syncen |
-| `FUT_GAME_YEAR` | `27` | EA FC 27 |
-| `POLL_INTERVAL_SECONDS` | `120` | Abstand zwischen Markt-Scans |
-| `DEFAULT_THRESHOLD_PCT` | `10` | Default für Auto-Scan und `/watch` |
-| `SCAN_MIN_PRICE` | `10000` | Fodder unter diesem Preis ignorieren |
-| `ALERT_COOLDOWN_MINUTES` | `30` | Spam-Schutz pro Watch |
-| `DATABASE_PATH` | `data/futbot.db` | SQLite-Datei für Watches und Snapshots |
-
-## Tests
-
-```bash
-pip install -r requirements-dev.txt
-python -m pytest
-```
-
-Die Live-Tests treffen die echten FUT.GG-Endpunkte und werden übersprungen, wenn das Netz sie blockt.
+Der Bot loggt sich **nicht** in EA-Accounts ein und handelt nicht auf dem Transfermarkt.
 
 ## Rechtliches
 
-- [Nutzungsbedingungen / Terms of Service](TERMS.md)
-- [Datenschutzerklärung / Privacy Policy](PRIVACY.md)
-
-## APIs
-
-- `GET https://www.fut.gg/api/fut/players/v2/27/?name=` — Spielersuche
-- `GET https://www.fut.gg/api/fut/global-search/27/players/?q=` — Fallback-Suche
-- `GET https://www.fut.gg/api/fut/players/v2/momentum/24/?game=27` — Momentum
-- `GET https://s3.eu-west-2.amazonaws.com/game-assets.fut.gg/27/cdn-data/player-prices-index.json`
-- `GET https://s3.eu-west-2.amazonaws.com/game-assets.fut.gg/27/cdn-data/player-prices-ps5-dyn.json`
-- `GET https://s3.eu-west-2.amazonaws.com/game-assets.fut.gg/27/cdn-data/player-prices-pc-dyn.json`
+- [Nutzungsbedingungen](TERMS.md)
+- [Datenschutzerklärung](PRIVACY.md)
+- [Lizenz — alle Rechte vorbehalten](LICENSE)

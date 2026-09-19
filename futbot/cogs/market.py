@@ -8,7 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
-from futbot.branding import HELP_TITLE
+from futbot.branding import COPYRIGHT, HELP_TITLE
 from futbot.config import Settings
 from futbot.db import Store, Watch
 from futbot.formatting import (
@@ -21,7 +21,7 @@ from futbot.formatting import (
     player_embed,
     search_embed,
 )
-from futbot.legal import privacy_embed
+from futbot.legal import privacy_embed, setup_guide_embed
 from futbot.market.models import PlayerCard, Platform, PriceMove, WatchPlatform
 from futbot.market.service import MarketService
 from futbot.security import (
@@ -583,7 +583,7 @@ class MarketCog(commands.Cog):
             )
         )
 
-    @app_commands.command(name="setup", description="Alert-Kanal und automatischen Markt-Scan konfigurieren")
+    @app_commands.command(name="setup", description="Alert-Kanal und Auto-Scan auf diesem Server festlegen")
     @app_commands.describe(
         kanal="Kanal für automatische und manuelle Alerts",
         schwelle="Standard-Prozentschwelle für starke Bewegungen",
@@ -620,8 +620,9 @@ class MarketCog(commands.Cog):
             title=HELP_TITLE,
             color=0x2ECC71,
             description=(
-                "Der Bot liest Live-Preise über die FUT.GG-API (Suche + Preisblobs für PS und PC), "
-                "vergleicht sie mit dem letzten Stand und sendet Alerts bei starken Bewegungen.\n\n"
+                "Der Bot zeigt Live-Preise zu EA FC 27 Ultimate Team und sendet Alerts "
+                "bei starken Marktbewegungen.\n\n"
+                "**Einrichten:** `/einrichten` — Bot einladen, Kanal wählen, `/setup`.\n"
                 "**Automatisch:** Nach `/setup` scannt der Bot den Markt im Hintergrund.\n"
                 "**Manuell:** `/watch` bei %-Änderung, `/beobachten` wenn der Preis unter einen Zielwert fällt."
             ),
@@ -629,6 +630,8 @@ class MarketCog(commands.Cog):
         embed.add_field(
             name="Befehle",
             value=(
+                "`/einrichten` Setup auf diesem Server\n"
+                "`/setup` Alert-Kanal (Admin)\n"
                 "`/preis` aktueller Preis\n"
                 "`/suche` Spieler suchen\n"
                 "`/vergleichen` zwei Karten vergleichen\n"
@@ -640,12 +643,19 @@ class MarketCog(commands.Cog):
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
                 "`/schnappchen` unter Marktwert / günstige Plattform\n"
-                "`/datenschutz` Datenschutzerklärung\n"
-                "`/setup` Alert-Kanal (Admin)"
+                "`/datenschutz` Datenschutzerklärung"
             ),
             inline=False,
         )
+        embed.set_footer(text=COPYRIGHT)
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(
+        name="einrichten",
+        description="So richtest du diesen Bot auf dem Server ein (kein eigener Bot nötig)",
+    )
+    async def einrichten(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(embed=setup_guide_embed())
 
     @app_commands.command(
         name="datenschutz",

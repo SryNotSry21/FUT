@@ -50,13 +50,17 @@ Du musst die [Discord-Nutzungsbedingungen](https://discord.com/terms) und die EA
 
 - abuse commands, spam alerts or attempt to overload the Bot
 - use the Bot to break Discord, EA or applicable law (including real-money trading of in-game items where prohibited)
-- scrape, reverse engineer or impersonate the Bot
+- scrape, reverse engineer, copy or impersonate the Bot, or run an unofficial copy
 - invite the Bot to servers where you lack permission to add apps
 
 - Commands missbrauchen, Alerts spammen oder den Bot überlasten
 - den Bot nutzen, um gegen Discord, EA oder geltendes Recht zu verstoßen (einschließlich verbotenem Echtgeldhandel mit Spielitems)
-- den Bot auslesen, nachbauen oder sich als der Bot ausgeben
+- den Bot auslesen, **kopieren, nachbauen** oder sich als der Bot ausgeben
 - den Bot auf Server einladen, auf denen du keine Berechtigung zum Hinzufügen von Apps hast
+
+The Bot and its source are proprietary to 21Drehen. Inviting the official app does not grant a license to copy the software. See LICENSE.
+
+Der Bot und sein Quellcode sind Eigentum von 21Drehen. Das Einladen der offiziellen App erlaubt kein Kopieren der Software. Siehe LICENSE.
 
 Server admins who invite the Bot are responsible for choosing an alert channel and for how the Bot is used on that server.
 
