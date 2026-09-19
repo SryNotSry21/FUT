@@ -199,6 +199,8 @@ class Store:
             "SELECT platform, prices_json, updated_at FROM market_state"
         ).fetchall()
         for row in rows:
+            if row["platform"] != "ps5":
+                continue
             self._conn.execute(
                 """
                 INSERT INTO market_history (platform, captured_at, prices_json)
