@@ -5,6 +5,7 @@ import logging
 import discord
 from discord.ext import commands
 
+from futbot.branding import BOT_ACTIVITY, BOT_NAME, BOT_USERNAME_FALLBACK
 from futbot.config import Settings, load_settings
 from futbot.cogs.market import MarketCog
 from futbot.db import Store
@@ -57,10 +58,11 @@ class FutBot(commands.Bot):
             self.tree.copy_global_to(guild=guild)
             synced = await self.tree.sync(guild=guild)
             logger.info("Synced %s commands to %s", len(synced), guild.name)
+        await self._apply_identity()
         await self.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
-                name="EA FC 27 Markt",
+                name=BOT_ACTIVITY,
             )
         )
 
@@ -69,6 +71,29 @@ class FutBot(commands.Bot):
         self.tree.copy_global_to(guild=guild)
         synced = await self.tree.sync(guild=guild)
         logger.info("Synced %s commands to %s", len(synced), guild.name)
+        await self._nick_guild(guild)
+
+    async def _apply_identity(self) -> None:
+        if self.user and self.user.name not in {BOT_NAME, BOT_USERNAME_FALLBACK}:
+            for candidate in (BOT_NAME, BOT_USERNAME_FALLBACK):
+                try:
+                    await self.user.edit(username=candidate)
+                    logger.info("Discord username set to %s", candidate)
+                    break
+                except discord.HTTPException as exc:
+                    logger.warning("Could not set username %s: %s", candidate, exc)
+        for guild in self.guilds:
+            await self._nick_guild(guild)
+
+    async def _nick_guild(self, guild: discord.Guild) -> None:
+        me = guild.me
+        if me is None or me.nick == BOT_NAME:
+            return
+        try:
+            await me.edit(nick=BOT_NAME)
+            logger.info("Nickname in %s set to %s", guild.name, BOT_NAME)
+        except discord.HTTPException as exc:
+            logger.warning("Could not set nickname in %s: %s", guild.name, exc)
 
     async def close(self) -> None:
         await self.market.aclose()

@@ -8,6 +8,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands, tasks
 
+from futbot.branding import HELP_TITLE
 from futbot.config import Settings
 from futbot.db import Store, Watch
 from futbot.formatting import (
@@ -436,10 +437,10 @@ class MarketCog(commands.Cog):
             f"Schwelle {format_pct(float(schwelle))}."
         )
 
-    @app_commands.command(name="hilfe", description="Befehle des FC-27-Markt-Bots")
+    @app_commands.command(name="hilfe", description="Befehle des EA FC 27 Markt-Bots von 21Drehen")
     async def hilfe(self, interaction: discord.Interaction) -> None:
         embed = discord.Embed(
-            title="EA FC 27 Markt-Bot",
+            title=HELP_TITLE,
             color=0x2ECC71,
             description=(
                 "Der Bot liest Live-Preise über die FUT.GG-API (Suche + Preisblobs für PS und PC), "

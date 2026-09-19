@@ -1,4 +1,4 @@
-# EA FC 27 Markt-Bot
+# EA FC 27 Markt-Bot von 21Drehen
 
 Discord-Bot, der den **EA FC 27 Ultimate Team**-Markt über öffentliche FUT.GG-API-Schnittstellen überwacht, Preise vergleicht und Alerts schickt, wenn sich eine Karte stark bewegt.
 

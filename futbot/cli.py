@@ -61,7 +61,7 @@ async def cmd_movers(game_year: int, hours: int) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="EA FC 27 Markt-Bot")
+    parser = argparse.ArgumentParser(description="EA FC 27 Markt-Bot von 21Drehen")
     sub = parser.add_subparsers(dest="command")
     lookup = sub.add_parser("lookup", help="Spieler suchen und Preise anzeigen")
     lookup.add_argument("spieler")

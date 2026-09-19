@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import discord
 
+from futbot.branding import FOOTER
 from futbot.market.models import PlayerCard, PlayerQuote, Platform, PriceMove
 
 BRAND_COLOR = 0x2ECC71
@@ -48,7 +49,7 @@ def player_embed(quote: PlayerQuote, title: str | None = None) -> discord.Embed:
     embed.add_field(name="PS vs PC", value=spread, inline=True)
     if player.image_url:
         embed.set_thumbnail(url=player.image_url)
-    embed.set_footer(text="EA FC 27 · Preise von FUT.GG")
+        embed.set_footer(text=FOOTER)
     return embed
 
 
@@ -69,7 +70,7 @@ def compare_embed(left: PlayerQuote, right: PlayerQuote) -> discord.Embed:
     )
     if left.player.image_url:
         embed.set_thumbnail(url=left.player.image_url)
-    embed.set_footer(text="EA FC 27 · FUT.GG")
+    embed.set_footer(text=FOOTER)
     return embed
 
 
@@ -99,7 +100,7 @@ def move_embed(move: PriceMove, reason: str, mention: str | None = None) -> disc
     embed.add_field(name="Veränderung", value=format_delta(move.delta, move.pct), inline=False)
     if player and player.image_url:
         embed.set_thumbnail(url=player.image_url)
-    embed.set_footer(text="EA FC 27 Markt-Scanner")
+    embed.set_footer(text=FOOTER)
     return embed
 
 
@@ -118,7 +119,7 @@ def movers_embed(
         embed.description = "\n".join(extra_lines)
     embed.add_field(name="▲ Steigerungen", value=_move_list(risers) or "Keine", inline=False)
     embed.add_field(name="▼ Abstürze", value=_move_list(fallers) or "Keine", inline=False)
-    embed.set_footer(text="EA FC 27 · FUT.GG")
+    embed.set_footer(text=FOOTER)
     return embed
 
 
