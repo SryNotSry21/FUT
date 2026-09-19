@@ -8,7 +8,7 @@ from futbot.market.compare import (
     rank_year_bargains,
 )
 from futbot.formatting import bargains_embed, format_bargain_line
-from futbot.market.models import Bargain, PlayerCard
+from futbot.market.models import Bargain, PlayerCard, aggregate_price_stats
 
 
 def _card(ea_id: int, name: str, base: int | None = None) -> PlayerCard:
@@ -97,8 +97,9 @@ def test_bargain_line_shows_fair_to_cheap_not_delta() -> None:
     )
     text = format_bargain_line(deal)
     assert "Laura Georges" in text
-    assert "1.000.000 → 215.000 Coins" in text
-    assert "letzter Scan" in text
+    assert "Ø 1.000.000 → 215.000 Coins" in text
+    assert "letzter Scan" not in text
+    assert "FC 26" not in text
     assert "PC" not in text
     assert "785.000" not in text
 
@@ -191,10 +192,10 @@ def test_comparable_year_card_requires_similar_overall() -> None:
     assert comparable_year_card(same, last_same) is True
 
 
-def test_rank_ps_bargains_uses_higher_of_scan_and_year() -> None:
+def test_rank_ps_bargains_uses_average_not_last_year() -> None:
     deals = rank_ps_bargains(
         current={10: 200_000, 11: 400_000},
-        last_scan={10: 280_000, 11: 410_000},
+        stats=aggregate_price_stats([{10: 280_000, 11: 410_000}]),
         last_year={10: 500_000},
         min_price=15_000,
         min_pct=20,
@@ -202,15 +203,17 @@ def test_rank_ps_bargains_uses_higher_of_scan_and_year() -> None:
     )
     by_id = {deal.ea_id: deal for deal in deals}
     assert 10 in by_id
-    assert by_id[10].fair_price == 500_000
-    assert by_id[10].reason == "beides"
+    assert by_id[10].fair_price == 280_000
+    assert by_id[10].avg_price == 280_000
+    assert by_id[10].year_fair == 500_000
+    assert by_id[10].reason == "tief"
     assert 11 not in by_id
 
 
-def test_rank_ps_bargains_drops_extreme_year_ratio() -> None:
+def test_rank_ps_bargains_ignores_year_only_without_average_gap() -> None:
     deals = rank_ps_bargains(
         current={12: 40_000},
-        last_scan={},
+        stats=aggregate_price_stats([{12: 40_000}]),
         last_year={12: 650_000},
         min_price=15_000,
         min_pct=20,
@@ -219,17 +222,68 @@ def test_rank_ps_bargains_drops_extreme_year_ratio() -> None:
     assert deals == []
 
 
+def test_rank_ps_bargains_drops_extreme_year_ratio_from_mention() -> None:
+    deals = rank_ps_bargains(
+        current={12: 200_000},
+        stats=aggregate_price_stats([{12: 280_000}]),
+        last_year={12: 2_000_000},
+        min_price=15_000,
+        min_pct=20,
+        min_delta=20_000,
+    )
+    assert len(deals) == 1
+    assert deals[0].fair_price == 280_000
+    assert deals[0].year_fair is None
+
+
+def test_rank_ps_bargains_marks_new_low_and_average() -> None:
+    stats = aggregate_price_stats(
+        [
+            {1: 300_000},
+            {1: 250_000},
+            {1: 280_000},
+        ]
+    )
+    assert stats[1].low == 250_000
+    assert stats[1].average == 276_666
+    at_low = rank_ps_bargains(
+        current={1: 250_000},
+        stats=stats,
+        min_price=15_000,
+        min_pct=5,
+        min_delta=10_000,
+    )
+    assert len(at_low) == 1
+    assert at_low[0].at_low is True
+    assert at_low[0].low_price == 250_000
+    assert at_low[0].reason == "tief"
+    below_avg = rank_ps_bargains(
+        current={1: 260_000},
+        stats=stats,
+        min_price=15_000,
+        min_pct=5,
+        min_delta=10_000,
+    )
+    assert len(below_avg) == 1
+    assert below_avg[0].at_low is False
+    assert below_avg[0].reason == "markt"
+    assert below_avg[0].fair_price == 276_666
+
+
 def test_finalize_drops_weaker_year_card_and_keeps_scan() -> None:
     deal = Bargain(
         ea_id=1,
         cheap_platform="ps5",
         cheap_price=200_000,
         fair_platform="ps5",
-        fair_price=500_000,
-        pct_below=60.0,
-        reason="beides",
+        fair_price=300_000,
+        pct_below=33.333,
+        reason="markt",
         scan_fair=300_000,
         year_fair=500_000,
+        avg_price=300_000,
+        low_price=280_000,
+        at_low=False,
     )
     current = PlayerCard(
         ea_id=1,
@@ -264,22 +318,53 @@ def test_finalize_drops_weaker_year_card_and_keeps_scan() -> None:
     assert kept.year_fair is None
 
 
-def test_year_bargain_line_and_embed_mention_last_year() -> None:
+def test_year_bargain_line_and_embed_mention_last_year_separately() -> None:
     deal = Bargain(
         ea_id=209331,
         cheap_platform="ps5",
         cheap_price=150_000,
         fair_platform="ps5",
-        fair_price=610_000,
-        pct_below=75.4,
-        reason="vorjahr",
+        fair_price=200_000,
+        pct_below=25.0,
+        reason="markt",
         player=_card(209331, "Mohamed Salah"),
+        avg_price=200_000,
+        low_price=140_000,
+        year_fair=610_000,
+        at_low=False,
     )
-    text = format_bargain_line(deal)
+    text = format_bargain_line(deal, previous_game_year=26)
     assert "Mohamed Salah" in text
-    assert "610.000 → 150.000 Coins" in text
-    assert "vs FC 26" in text
+    assert "Ø 200.000 → 150.000 Coins" in text
+    assert "Tief 140.000" in text
+    assert "FC 26: 610.000" in text
+    assert "vs FC 26" not in text
+    assert "610.000 → 150.000" not in text
     embed = bargains_embed([deal], previous_game_year=26)
     assert embed.title and "Schnapper" in embed.title
     assert "Mohamed Salah" in embed.fields[0].value
+    assert "FC 26: 610.000" in embed.fields[0].value
+    description = embed.description or ""
+    assert "Hinweis" in description
+    assert "Vergleichsbasis" in description
     assert "Günstiger als die andere Plattform" not in embed.fields[0].name
+
+
+def test_bargain_line_flags_low_price() -> None:
+    deal = Bargain(
+        ea_id=1,
+        cheap_platform="ps5",
+        cheap_price=140_000,
+        fair_platform="ps5",
+        fair_price=200_000,
+        pct_below=30.0,
+        reason="tief",
+        player=_card(1, "Laura Georges"),
+        avg_price=200_000,
+        low_price=140_000,
+        at_low=True,
+    )
+    text = format_bargain_line(deal)
+    assert "am Tiefpreis" in text
+    assert "Tief 140.000" in text
+    assert "Ø 200.000 → 140.000" in text

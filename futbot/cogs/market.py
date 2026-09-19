@@ -534,10 +534,10 @@ class MarketCog(commands.Cog):
 
     @app_commands.command(
         name="schnapper",
-        description="PlayStation-Schnapper: unter letztem Scan oder Vorjahrespreis",
+        description="PlayStation-Schnapper: unter Ø-Preis oder am Tiefpreis",
     )
     @app_commands.describe(
-        min_prozent="Mindest-Abstand zum Vergleichspreis",
+        min_prozent="Mindest-Abstand zum Durchschnittspreis",
         min_preis="Mindestpreis der günstigen Seite",
     )
     async def schnapper(
@@ -547,19 +547,19 @@ class MarketCog(commands.Cog):
         min_preis: app_commands.Range[int, 1000, 500_000] = 15_000,
     ) -> None:
         await interaction.response.defer()
+        previous_year = self.market.game_year - 1
         deals = await self.market.schnapper_deals(
-            self.store.load_snapshot("ps5"),
+            self.store.load_price_stats("ps5"),
             min_price=int(min_preis),
             min_pct=float(min_prozent),
             limit=10,
         )
-        previous_year = self.market.game_year - 1
         await interaction.followup.send(
             embed=bargains_embed(
                 deals,
                 extra_lines=[
-                    "Nur PlayStation. Fairer Wert = der höhere Preis aus letztem Scan und Vorjahr.",
-                    "Vorjahr zählt nur bei gleichem Spieler und ähnlichem Overall.",
+                    "Nur PlayStation. Fairer Wert = Ø-BIN der letzten Scans; dazu der Tiefpreis.",
+                    f"FC {previous_year} nur als Hinweis, nicht als Vergleichsbasis.",
                     f"Schwelle {format_pct(float(min_prozent))} · ab {format_coins(int(min_preis))}",
                 ],
                 previous_game_year=previous_year,
@@ -677,6 +677,8 @@ class MarketCog(commands.Cog):
     async def _run_scan(self) -> None:
         catalog = await self.market.catalog(force=True)
         now = time.time()
+        current = catalog.snapshot("ps5")
+        previous = self.store.load_snapshot("ps5")
         watches = self.store.all_watches()
         guilds = {guild.id: guild for guild in self.bot.guilds}
 
@@ -710,8 +712,6 @@ class MarketCog(commands.Cog):
             guild = guilds.get(settings.guild_id)
             if guild is None:
                 continue
-            previous = self.store.load_snapshot("ps5")
-            current = catalog.snapshot("ps5")
             if previous:
                 risers, fallers = await self.market.scan_snapshot_moves(
                     previous,
@@ -740,9 +740,9 @@ class MarketCog(commands.Cog):
                                     ],
                                 )
                             )
-            self.store.save_snapshot("ps5", current)
 
-        self.store.save_snapshot("ps5", catalog.snapshot("ps5"))
+        self.store.save_snapshot("ps5", current)
+        self.store.append_history("ps5", current)
 
     def _watch_moves(
         self,

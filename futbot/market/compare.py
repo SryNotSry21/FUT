@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from dataclasses import replace
 
-from futbot.market.models import Bargain, BargainReason, PlayerCard, Platform
+from futbot.market.models import Bargain, BargainReason, PlayerCard, Platform, PriceStats
 
 
 def percent_change(old: int, new: int) -> float:
@@ -204,10 +204,27 @@ def bargain_score(cheap_price: int, pct_below: float, coins_saved: int) -> float
     return coins_saved * math.sqrt(max(pct_below, 1.0))
 
 
+def _display_year_price(
+    cheap_price: int,
+    year_price: int | None,
+    *,
+    min_price: int,
+    max_price: int,
+) -> int | None:
+    """Keep last-year BIN only as a side mention, never as fair value."""
+    if year_price is None:
+        return None
+    if not min_price <= year_price <= max_price:
+        return None
+    if year_price / max(cheap_price, 1) > YEAR_MAX_RATIO:
+        return None
+    return year_price
+
+
 def rank_ps_bargains(
     current: dict[int, int],
-    last_scan: dict[int, int],
-    last_year: dict[int, int],
+    stats: dict[int, PriceStats],
+    last_year: dict[int, int] | None = None,
     *,
     min_price: int = 15_000,
     min_pct: float = 20.0,
@@ -215,48 +232,46 @@ def rank_ps_bargains(
     max_price: int = MAX_REALISTIC_BIN,
     limit: int = 40,
 ) -> list[Bargain]:
-    """PS BIN vs the better of last scan and last year's PS BIN."""
+    """PS BIN vs recent average; tag cards sitting at the recent low. Last year is display-only."""
+    year_prices = last_year or {}
     found: list[Bargain] = []
     for ea_id, cheap_price in current.items():
         if cheap_price < min_price or cheap_price > max_price:
             continue
-        scan_fair = last_scan.get(ea_id)
-        year_fair = last_year.get(ea_id)
-        if scan_fair is not None and not min_price <= scan_fair <= max_price:
-            scan_fair = None
-        if year_fair is not None and not min_price <= year_fair <= max_price:
-            year_fair = None
-        if year_fair is not None and year_fair / max(cheap_price, 1) > YEAR_MAX_RATIO:
-            year_fair = None
-        if scan_fair is not None and scan_fair <= cheap_price:
-            scan_fair = None
-        if year_fair is not None and year_fair <= cheap_price:
-            year_fair = None
-        refs = [price for price in (scan_fair, year_fair) if price]
-        if not refs:
+        sample = stats.get(ea_id)
+        if sample is None or sample.samples < 1:
             continue
-        fair_price = max(refs)
-        delta = fair_price - cheap_price
-        pct_below = (delta / fair_price) * 100.0
+        avg_price = sample.average
+        low_price = sample.low
+        if not min_price <= avg_price <= max_price:
+            continue
+        if cheap_price >= avg_price:
+            continue
+        delta = avg_price - cheap_price
+        pct_below = (delta / avg_price) * 100.0
         if pct_below < min_pct or delta < min_delta:
             continue
-        if scan_fair and year_fair:
-            reason: BargainReason = "beides"
-        elif year_fair:
-            reason = "vorjahr"
-        else:
-            reason = "markt"
+        at_low = cheap_price <= low_price
+        reason: BargainReason = "tief" if at_low else "markt"
         found.append(
             Bargain(
                 ea_id=ea_id,
                 cheap_platform="ps5",
                 cheap_price=cheap_price,
                 fair_platform="ps5",
-                fair_price=fair_price,
+                fair_price=avg_price,
                 pct_below=pct_below,
                 reason=reason,
-                scan_fair=scan_fair,
-                year_fair=year_fair,
+                scan_fair=sample.last,
+                year_fair=_display_year_price(
+                    cheap_price,
+                    year_prices.get(ea_id),
+                    min_price=min_price,
+                    max_price=max_price,
+                ),
+                avg_price=avg_price,
+                low_price=low_price,
+                at_low=at_low,
             )
         )
     found.sort(
@@ -274,35 +289,16 @@ def finalize_ps_bargain(
     min_pct: float,
     min_delta: int,
 ) -> Bargain | None:
-    """Drop last-year refs that are a worse/different card, then rebuild fair value."""
-
-    scan_fair = deal.scan_fair
+    """Attach the live card and drop last-year mentions that are a worse/different card."""
     year_fair = deal.year_fair
     if year_fair is not None and not comparable_year_card(current, previous):
         year_fair = None
-    refs: list[tuple[str, int]] = []
-    if scan_fair is not None and scan_fair > deal.cheap_price:
-        refs.append(("markt", scan_fair))
-    if year_fair is not None and year_fair > deal.cheap_price:
-        refs.append(("vorjahr", year_fair))
-    if not refs:
-        return None
-    if len(refs) == 2:
-        reason = "beides"
-        fair_price = max(scan_fair or 0, year_fair or 0)
-    else:
-        reason, fair_price = refs[0]
-    delta = fair_price - deal.cheap_price
-    pct_below = (delta / fair_price) * 100.0
-    if pct_below < min_pct or delta < min_delta:
+    delta = deal.fair_price - deal.cheap_price
+    if deal.pct_below < min_pct or delta < min_delta:
         return None
     return replace(
         deal,
-        fair_price=fair_price,
-        pct_below=pct_below,
-        reason=reason,  # type: ignore[arg-type]
         player=current,
-        scan_fair=scan_fair,
         year_fair=year_fair,
     )
 

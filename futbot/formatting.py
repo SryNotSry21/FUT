@@ -143,13 +143,14 @@ def bargains_embed(
             extra_lines
             or [
                 "Nur PlayStation-Preise von FUT.GG.",
-                f"Fairer Wert = höherer Preis aus letztem Scan und FC {year} (gleiche Karte/ähnliches Overall).",
+                "Fairer Wert = Ø-BIN der letzten Scans; zusätzlich der Tiefpreis.",
+                f"FC {year} nur als Hinweis, nicht als Vergleichsbasis.",
             ]
         ),
     )
     embed.add_field(
         name="Unter Marktwert",
-        value=_bargain_list(deals) or "Keine",
+        value=_bargain_list(deals, previous_game_year=year) or "Keine",
         inline=False,
     )
     embed.set_footer(text=FOOTER)
@@ -216,18 +217,25 @@ def bargain_display_name(deal: Bargain) -> str:
     return f"ID {deal.ea_id}"
 
 
-def format_bargain_line(deal: Bargain) -> str:
+def format_bargain_line(deal: Bargain, previous_game_year: int | None = None) -> str:
+    year = previous_game_year or 26
+    avg = deal.avg_price if deal.avg_price is not None else deal.fair_price
     path = (
-        f"▼ {format_coin_amount(deal.fair_price)} → {format_coin_amount(deal.cheap_price)} Coins "
+        f"▼ Ø {format_coin_amount(avg)} → {format_coin_amount(deal.cheap_price)} Coins "
         f"({format_pct(-deal.pct_below)})"
     )
-    why = {
-        "vorjahr": "vs FC 26",
-        "beides": "letzter Scan + FC 26",
-        "markt": "letzter Scan",
-    }.get(deal.reason, "letzter Scan")
-    return f"**{bargain_display_name(deal)}** {path} · {why}"
+    extras: list[str] = []
+    if deal.low_price is not None:
+        extras.append(f"Tief {format_coin_amount(deal.low_price)}")
+        if deal.at_low or deal.reason == "tief":
+            extras.append("am Tiefpreis")
+    elif deal.at_low or deal.reason == "tief":
+        extras.append("am Tiefpreis")
+    if deal.year_fair is not None:
+        extras.append(f"FC {year}: {format_coin_amount(deal.year_fair)}")
+    suffix = f" · {' · '.join(extras)}" if extras else ""
+    return f"**{bargain_display_name(deal)}** {path}{suffix}"
 
 
-def _bargain_list(deals: list[Bargain]) -> str:
-    return "\n".join(format_bargain_line(deal) for deal in deals[:10])
+def _bargain_list(deals: list[Bargain], previous_game_year: int | None = None) -> str:
+    return "\n".join(format_bargain_line(deal, previous_game_year) for deal in deals[:10])

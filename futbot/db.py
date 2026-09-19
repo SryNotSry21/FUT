@@ -6,7 +6,9 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from futbot.market.models import PlayerCard, Platform, WatchPlatform
+from futbot.market.models import PlayerCard, Platform, PriceStats, WatchPlatform, aggregate_price_stats
+
+MARKET_HISTORY_LIMIT = 36
 
 
 @dataclass
@@ -115,10 +117,21 @@ class Store:
                 prices_json TEXT NOT NULL,
                 updated_at REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS market_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                platform TEXT NOT NULL,
+                captured_at REAL NOT NULL,
+                prices_json TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_market_history_platform_time
+                ON market_history(platform, captured_at DESC, id DESC);
             """
         )
         self._migrate_watch_uniqueness()
         self._migrate_target_below()
+        self._seed_market_history()
         self._conn.commit()
 
     def _migrate_watch_uniqueness(self) -> None:
@@ -176,6 +189,23 @@ class Store:
         columns = {row[1] for row in self._conn.execute("PRAGMA table_info(watches)").fetchall()}
         if "target_below" not in columns:
             self._conn.execute("ALTER TABLE watches ADD COLUMN target_below INTEGER")
+
+    def _seed_market_history(self) -> None:
+        """Use the latest live snapshot as the first history sample after upgrade."""
+        count = self._conn.execute("SELECT COUNT(*) AS n FROM market_history").fetchone()
+        if count and int(count["n"]) > 0:
+            return
+        rows = self._conn.execute(
+            "SELECT platform, prices_json, updated_at FROM market_state"
+        ).fetchall()
+        for row in rows:
+            self._conn.execute(
+                """
+                INSERT INTO market_history (platform, captured_at, prices_json)
+                VALUES (?, ?, ?)
+                """,
+                (row["platform"], row["updated_at"], row["prices_json"]),
+            )
 
     def get_guild(self, guild_id: int) -> GuildSettings:
         row = self._conn.execute(
@@ -387,6 +417,7 @@ class Store:
         return {int(key): int(value) for key, value in raw.items()}
 
     def save_snapshot(self, platform: Platform, prices: dict[int, int]) -> None:
+        encoded = json.dumps({str(k): v for k, v in prices.items()})
         self._conn.execute(
             """
             INSERT INTO market_state (platform, prices_json, updated_at)
@@ -395,9 +426,54 @@ class Store:
                 prices_json = excluded.prices_json,
                 updated_at = excluded.updated_at
             """,
-            (platform, json.dumps({str(k): v for k, v in prices.items()}), time.time()),
+            (platform, encoded, time.time()),
         )
         self._conn.commit()
+
+    def append_history(self, platform: Platform, prices: dict[int, int]) -> None:
+        encoded = json.dumps({str(k): v for k, v in prices.items()})
+        self._conn.execute(
+            """
+            INSERT INTO market_history (platform, captured_at, prices_json)
+            VALUES (?, ?, ?)
+            """,
+            (platform, time.time(), encoded),
+        )
+        rows = self._conn.execute(
+            """
+            SELECT id FROM market_history
+            WHERE platform = ?
+            ORDER BY captured_at DESC, id DESC
+            """,
+            (platform,),
+        ).fetchall()
+        extra = [(row["id"],) for row in rows[MARKET_HISTORY_LIMIT:]]
+        if extra:
+            self._conn.executemany("DELETE FROM market_history WHERE id = ?", extra)
+        self._conn.commit()
+
+    def load_history_snapshots(
+        self,
+        platform: Platform,
+        limit: int = MARKET_HISTORY_LIMIT,
+    ) -> list[dict[int, int]]:
+        rows = self._conn.execute(
+            """
+            SELECT prices_json FROM market_history
+            WHERE platform = ?
+            ORDER BY captured_at DESC, id DESC
+            LIMIT ?
+            """,
+            (platform, limit),
+        ).fetchall()
+        snapshots: list[dict[int, int]] = []
+        for row in reversed(rows):
+            raw = json.loads(row["prices_json"])
+            snapshots.append({int(key): int(value) for key, value in raw.items()})
+        return snapshots
+
+    def load_price_stats(self, platform: Platform) -> dict[int, PriceStats]:
+        return aggregate_price_stats(self.load_history_snapshots(platform))
 
 
 def _watch_from_row(row: sqlite3.Row) -> Watch:

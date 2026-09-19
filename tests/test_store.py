@@ -89,3 +89,43 @@ def test_market_snapshot_roundtrip(tmp_path: Path) -> None:
     assert loaded[231747] == 3_800_000
     assert loaded[37576] == 11_800_000
     store.close()
+
+
+def test_market_history_average_and_low(tmp_path: Path) -> None:
+    store = Store(tmp_path / "bot.db")
+    store.append_history("ps5", {10: 300_000, 11: 100_000})
+    store.append_history("ps5", {10: 250_000, 11: 100_000})
+    store.append_history("ps5", {10: 280_000, 11: 90_000})
+    stats = store.load_price_stats("ps5")
+    assert stats[10].low == 250_000
+    assert stats[10].average == 276_666
+    assert stats[10].last == 280_000
+    assert stats[10].samples == 3
+    assert stats[11].low == 90_000
+    assert stats[11].average == 96_666
+    store.close()
+
+
+def test_market_history_keeps_a_sliding_window(tmp_path: Path) -> None:
+    from futbot.db import MARKET_HISTORY_LIMIT
+
+    store = Store(tmp_path / "bot.db")
+    for index in range(MARKET_HISTORY_LIMIT + 5):
+        store.append_history("ps5", {1: 100_000 + index})
+    snapshots = store.load_history_snapshots("ps5")
+    assert len(snapshots) == MARKET_HISTORY_LIMIT
+    assert snapshots[0][1] == 100_000 + 5
+    assert snapshots[-1][1] == 100_000 + MARKET_HISTORY_LIMIT + 4
+    store.close()
+
+
+def test_market_history_seeds_from_existing_snapshot(tmp_path: Path) -> None:
+    store = Store(tmp_path / "bot.db")
+    store.save_snapshot("ps5", {7: 222_000})
+    store.close()
+    again = Store(tmp_path / "bot.db")
+    stats = again.load_price_stats("ps5")
+    assert stats[7].average == 222_000
+    assert stats[7].low == 222_000
+    assert stats[7].samples == 1
+    again.close()

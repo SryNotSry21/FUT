@@ -24,6 +24,7 @@ def test_setup_guide_is_invite_only_not_bot_creation() -> None:
     assert INVITE_URL in body
     assert "keinen eigenen Bot" in body
     assert "/setup" in body
+    assert "Ø-BIN" in body or "Tiefpreis" in body
     lowered = body.lower()
     assert "discord.com/developers" not in lowered
     assert "token" not in lowered

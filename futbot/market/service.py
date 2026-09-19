@@ -17,7 +17,7 @@ from futbot.market.compare import (
     rank_ps_bargains,
 )
 from futbot.market.futgg import FutGGClient
-from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
+from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove, PriceStats
 
 logger = logging.getLogger(__name__)
 PREVIOUS_YEAR_CACHE_TTL = 600.0
@@ -220,7 +220,7 @@ class MarketService:
 
     async def schnapper_deals(
         self,
-        last_scan: dict[int, int],
+        stats: dict[int, PriceStats],
         min_price: int = 15_000,
         min_pct: float = 20.0,
         limit: int = 10,
@@ -230,7 +230,7 @@ class MarketService:
         last_year = previous.snapshot("ps5") if previous else {}
         deals = rank_ps_bargains(
             catalog.snapshot("ps5"),
-            last_scan,
+            stats,
             last_year,
             min_price=min_price,
             min_pct=min_pct,
