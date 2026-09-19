@@ -18,7 +18,11 @@ PLATFORM_LABEL = {"ps5": "PlayStation / Konsole", "pc": "PC"}
 def format_coins(value: int | None) -> str:
     if value is None:
         return "—"
-    return f"{value:,}".replace(",", ".") + " Coins"
+    return f"{format_coin_amount(value)} Coins"
+
+
+def format_coin_amount(value: int) -> str:
+    return f"{value:,}".replace(",", ".")
 
 
 def format_pct(value: float) -> str:
@@ -30,8 +34,17 @@ def format_pct(value: float) -> str:
 def format_delta(delta: int, pct: float) -> str:
     arrow = "▼" if delta < 0 else "▲"
     sign = "+" if delta > 0 else ""
-    coins = f"{sign}{abs(delta):,}".replace(",", ".")
+    coins = f"{sign}{format_coin_amount(abs(delta))}"
     return f"{arrow} {coins} ({format_pct(pct)})"
+
+
+def format_price_path(move: PriceMove) -> str:
+    """Old price → new price plus percent, never the raw coin delta as a fake start price."""
+    arrow = "▼" if move.is_drop else "▲"
+    return (
+        f"{arrow} {format_coin_amount(move.old_price)} → {format_coin_amount(move.new_price)} Coins "
+        f"({format_pct(move.pct)})"
+    )
 
 
 def player_embed(quote: PlayerQuote, title: str | None = None) -> discord.Embed:
@@ -186,7 +199,5 @@ def move_display_name(move: PriceMove) -> str:
 def _move_list(moves: list[PriceMove]) -> str:
     lines = []
     for move in moves[:8]:
-        lines.append(
-            f"**{move_display_name(move)}** {format_delta(move.delta, move.pct)} → {format_coins(move.new_price)}"
-        )
+        lines.append(f"**{move_display_name(move)}** {format_price_path(move)}")
     return "\n".join(lines)

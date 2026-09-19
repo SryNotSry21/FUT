@@ -133,7 +133,7 @@ class MarketService:
                     base_player_ea_id=card.base_player_ea_id,
                     quality=card.quality,
                     momentum_pct=card.momentum_pct,
-                    listed_price=quote.ps5.price or card.listed_price,
+                    listed_price=card.listed_price or quote.ps5.price,
                 )
             )
         return enriched

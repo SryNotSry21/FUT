@@ -386,13 +386,16 @@ class MarketCog(commands.Cog):
         for card in ranked:
             pct = card.momentum_pct or 0.0
             price = card.listed_price or 0
-            old = int(price / (1 + pct / 100)) if pct != -100 else price
+            if price <= 0 or pct == 0:
+                continue
+            old = int(round(price / (1 + pct / 100))) if pct != -100 else price
+            old = max(old, 1)
             move = PriceMove(
                 ea_id=card.ea_id,
                 platform="ps5",
-                old_price=max(old, 1),
+                old_price=old,
                 new_price=price,
-                delta=price - max(old, 1),
+                delta=price - old,
                 pct=pct,
                 player=card,
             )
