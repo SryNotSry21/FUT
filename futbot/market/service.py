@@ -13,7 +13,6 @@ from futbot.market.compare import (
     rank_movers,
     rank_platform_bargains,
 )
-from futbot.market.futbin import FutbinClient
 from futbot.market.futgg import FutGGClient
 from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
 
@@ -23,7 +22,6 @@ class MarketService:
         self.game_year = game_year
         self.cache_ttl = cache_ttl
         self.futgg = FutGGClient(game_year=game_year)
-        self.futbin = FutbinClient(game_year=game_year)
         self._catalog: PriceCatalog | None = None
         self._catalog_loaded_at = 0.0
         self._players: dict[int, PlayerCard] = {}
@@ -31,7 +29,6 @@ class MarketService:
 
     async def aclose(self) -> None:
         await self.futgg.aclose()
-        await self.futbin.aclose()
 
     async def search(self, query: str, limit: int = 8) -> list[PlayerCard]:
         cards = await self.futgg.search_players(query, limit=limit)
