@@ -32,6 +32,21 @@ def is_significant_move(
     return False, delta, pct
 
 
+def crossed_below_target(
+    old_price: int | None,
+    new_price: int | None,
+    target: int | None,
+) -> bool:
+    """True when the price moves from above the target to at or below it."""
+    if target is None or target <= 0 or new_price is None:
+        return False
+    if new_price > target:
+        return False
+    if old_price is None:
+        return False
+    return old_price > target
+
+
 def rank_movers(
     previous: dict[int, int],
     current: dict[int, int],

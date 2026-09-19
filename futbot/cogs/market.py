@@ -167,6 +167,7 @@ class MarketCog(commands.Cog):
         plattform="Welche Preise auslösen",
         schwelle_prozent="Prozentuale Änderung (Standard: Server-Wert)",
         schwelle_coins="Optional: absolute Coin-Änderung",
+        unter="Optional: Alert, wenn der Preis unter diesen Wert fällt",
     )
     @app_commands.autocomplete(spieler=_autocomplete_player)
     async def watch(
@@ -176,6 +177,7 @@ class MarketCog(commands.Cog):
         plattform: PlatformChoice = "beide",
         schwelle_prozent: app_commands.Range[float, 1, 90] | None = None,
         schwelle_coins: app_commands.Range[int, 100, 10_000_000] | None = None,
+        unter: app_commands.Range[int, 500, 15_000_000] | None = None,
     ) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
@@ -190,6 +192,7 @@ class MarketCog(commands.Cog):
 
         async def save(inter: discord.Interaction, card: PlayerCard) -> None:
             quote = await self.market.quote_player(card)
+            existing = self.store.get_user_watch(interaction.guild.id, inter.user.id, card.ea_id)  # type: ignore[union-attr]
             watch = self.store.add_watch(
                 guild_id=interaction.guild.id,  # type: ignore[union-attr]
                 user_id=inter.user.id,
@@ -197,6 +200,7 @@ class MarketCog(commands.Cog):
                 platform=plattform,
                 threshold_pct=float(threshold),
                 threshold_coins=int(schwelle_coins) if schwelle_coins else None,
+                target_below=int(unter) if unter else (existing.target_below if existing else None),
             )
             self.store.update_watch_prices(
                 watch.id, quote.ps5.price, quote.pc.price, alerted=False
@@ -205,6 +209,7 @@ class MarketCog(commands.Cog):
                 f"Alert für **{card.label}** ist aktiv.\n"
                 f"Schwelle: {format_pct(float(threshold))}"
                 + (f" oder {format_coins(int(schwelle_coins))}" if schwelle_coins else "")
+                + (f"\nUnter: {format_coins(watch.target_below)}" if watch.target_below else "")
                 + f"\nPlattform: {plattform}\n"
                 f"Aktuell PS {format_coins(quote.ps5.price)} · PC {format_coins(quote.pc.price)}"
             )
@@ -223,6 +228,86 @@ class MarketCog(commands.Cog):
 
         await interaction.followup.send(
             "Welche Karte soll überwacht werden?",
+            embed=search_embed(spieler, cards),
+            view=PlayerPickView(cards, picked, owner_id=interaction.user.id),
+        )
+
+    @app_commands.command(
+        name="beobachten",
+        description="Beobachtungsliste: Alert, wenn der Preis unter einen Zielwert fällt",
+    )
+    @app_commands.describe(
+        spieler="Karte",
+        unter="Alert, sobald der Preis diesen Wert erreicht oder unterschreitet",
+        plattform="Welche Preise geprüft werden",
+    )
+    @app_commands.autocomplete(spieler=_autocomplete_player)
+    async def beobachten(
+        self,
+        interaction: discord.Interaction,
+        spieler: str,
+        unter: app_commands.Range[int, 500, 15_000_000],
+        plattform: PlatformChoice = "beide",
+    ) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
+            return
+        await interaction.response.defer()
+        cards = await self._lookup(spieler)
+        if not cards:
+            await interaction.followup.send(f"Keine Karte für **{spieler}** gefunden.")
+            return
+        target = int(unter)
+
+        async def save(inter: discord.Interaction, card: PlayerCard) -> None:
+            quote = await self.market.quote_player(card)
+            existing = self.store.get_user_watch(interaction.guild.id, inter.user.id, card.ea_id)  # type: ignore[union-attr]
+            watch = self.store.add_watch(
+                guild_id=interaction.guild.id,  # type: ignore[union-attr]
+                user_id=inter.user.id,
+                player=card,
+                platform=plattform,
+                threshold_pct=existing.threshold_pct if existing else 0.0,
+                threshold_coins=existing.threshold_coins if existing else None,
+                target_below=target,
+            )
+            self.store.update_watch_prices(
+                watch.id, quote.ps5.price, quote.pc.price, alerted=False
+            )
+            already = []
+            if plattform in ("ps5", "beide") and quote.ps5.price is not None and quote.ps5.price <= target:
+                already.append(f"PS {format_coins(quote.ps5.price)}")
+            if plattform in ("pc", "beide") and quote.pc.price is not None and quote.pc.price <= target:
+                already.append(f"PC {format_coins(quote.pc.price)}")
+            text = (
+                f"**{card.label}** steht auf der Beobachtungsliste.\n"
+                f"Alert, wenn der Preis **unter {format_coins(target)}** fällt.\n"
+                f"Plattform: {plattform}\n"
+                f"Aktuell PS {format_coins(quote.ps5.price)} · PC {format_coins(quote.pc.price)}"
+            )
+            if already:
+                text += (
+                    "\n\nDer Preis liegt **jetzt schon** darunter ("
+                    + ", ".join(already)
+                    + "). Der Alert kommt, sobald er erst wieder darüber liegt und dann erneut darunter fällt."
+                )
+            if inter.response.is_done():
+                await inter.followup.send(text, embed=player_embed(quote, title="Beobachtung gesetzt"))
+            else:
+                await inter.response.edit_message(
+                    content=text, embed=player_embed(quote, title="Beobachtung gesetzt"), view=None
+                )
+
+        if len(cards) == 1:
+            await save(interaction, cards[0])
+            return
+
+        async def picked(inter: discord.Interaction, ea_id: int) -> None:
+            card = next(c for c in cards if c.ea_id == ea_id)
+            await save(inter, card)
+
+        await interaction.followup.send(
+            "Welche Karte soll beobachtet werden?",
             embed=search_embed(spieler, cards),
             view=PlayerPickView(cards, picked, owner_id=interaction.user.id),
         )
@@ -294,12 +379,59 @@ class MarketCog(commands.Cog):
             owner = f" · <@{watch.user_id}>" if manager else ""
             lines.append(
                 f"• **{watch.name}** {watch.rating} {watch.position} · {watch.platform} · "
-                f"{format_pct(watch.threshold_pct)}"
+                + (
+                    f"unter {format_coins(watch.target_below)}"
+                    if watch.target_below
+                    else format_pct(watch.threshold_pct)
+                )
+                + (
+                    f" · {format_pct(watch.threshold_pct)}"
+                    if watch.target_below and watch.threshold_pct
+                    else ""
+                )
                 + (f" / {format_coins(watch.threshold_coins)}" if watch.threshold_coins else "")
                 + f" · PS {format_coins(watch.last_price_ps5)} · PC {format_coins(watch.last_price_pc)}"
                 + owner
             )
         embed = discord.Embed(title="Manuelle Alerts", description="\n".join(lines), color=0x2ECC71)
+        await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(
+        name="beobachtungen",
+        description="Deine Beobachtungsliste: Alerts unter einem Zielpreis",
+    )
+    async def beobachtungen(self, interaction: discord.Interaction) -> None:
+        if interaction.guild is None:
+            await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
+            return
+        manager = _is_guild_manager(interaction)
+        watches = [
+            watch
+            for watch in self.store.list_watches(
+                interaction.guild.id,
+                user_id=None if manager else interaction.user.id,
+            )
+            if watch.target_below
+        ]
+        if not watches:
+            await interaction.response.send_message(
+                "Keine Zielpreis-Beobachtungen. Setze eine mit `/beobachten spieler:… unter:…`."
+            )
+            return
+        lines = []
+        for watch in watches:
+            owner = f" · <@{watch.user_id}>" if manager else ""
+            lines.append(
+                f"• **{watch.name}** {watch.rating} {watch.position} · {watch.platform} · "
+                f"Alert unter {format_coins(watch.target_below)}"
+                f" · PS {format_coins(watch.last_price_ps5)} · PC {format_coins(watch.last_price_pc)}"
+                + owner
+            )
+        embed = discord.Embed(
+            title="Beobachtungsliste",
+            description="\n".join(lines),
+            color=0x2ECC71,
+        )
         await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
@@ -490,7 +622,7 @@ class MarketCog(commands.Cog):
                 "Der Bot liest Live-Preise über die FUT.GG-API (Suche + Preisblobs für PS und PC), "
                 "vergleicht sie mit dem letzten Stand und sendet Alerts bei starken Bewegungen.\n\n"
                 "**Automatisch:** Nach `/setup` scannt der Bot den Markt im Hintergrund.\n"
-                "**Manuell:** Mit `/watch` hängt du den Alert an konkrete Karten."
+                "**Manuell:** `/watch` bei %-Änderung, `/beobachten` wenn der Preis unter einen Zielwert fällt."
             ),
         )
         embed.add_field(
@@ -499,9 +631,11 @@ class MarketCog(commands.Cog):
                 "`/preis` aktueller Preis\n"
                 "`/suche` Spieler suchen\n"
                 "`/vergleichen` zwei Karten vergleichen\n"
-                "`/watch` Alert für eine Karte setzen\n"
+                "`/watch` Alert bei %-Änderung\n"
+                "`/beobachten` Alert unter Zielpreis\n"
                 "`/unwatch` Alert entfernen\n"
-                "`/watches` Liste der manuellen Alerts\n"
+                "`/watches` alle manuellen Alerts\n"
+                "`/beobachtungen` Beobachtungsliste (Zielpreis)\n"
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
                 "`/schnappchen` unter Marktwert / günstige Plattform\n"
@@ -549,21 +683,22 @@ class MarketCog(commands.Cog):
                 continue
             settings = self.store.get_guild(watch.guild_id)
             quote = catalog.quote(watch.as_player())
-            moves = self._watch_moves(watch, quote.ps5.price, quote.pc.price, settings.cooldown_minutes, now)
-            if moves:
+            tagged = self._watch_moves(watch, quote.ps5.price, quote.pc.price, settings.cooldown_minutes, now)
+            if tagged:
+                moves = [move for move, _reason in tagged]
                 await self._hydrate_moves(moves)
                 channel = await self._alert_channel(guild)
                 if channel:
-                    for move in moves:
+                    for move, (_original, reason) in zip(moves, tagged):
                         await channel.send(
                             embed=move_embed(
                                 move,
-                                reason=f"Manueller Watch · Schwelle {format_pct(watch.threshold_pct)}",
+                                reason=reason,
                                 mention=f"<@{watch.user_id}>",
                             )
                         )
             self.store.update_watch_prices(
-                watch.id, quote.ps5.price, quote.pc.price, alerted=bool(moves)
+                watch.id, quote.ps5.price, quote.pc.price, alerted=bool(tagged)
             )
 
         for settings in self.store.all_guilds_with_alerts():
@@ -616,18 +751,33 @@ class MarketCog(commands.Cog):
         pc_price: int | None,
         cooldown_minutes: int,
         now: float,
-    ) -> list[PriceMove]:
-        if watch.last_alert_at and now - watch.last_alert_at < cooldown_minutes * 60:
-            return []
+    ) -> list[tuple[PriceMove, str]]:
         platforms: list[tuple[Platform, int | None, int | None]] = []
         if watch.platform in ("ps5", "beide"):
             platforms.append(("ps5", watch.last_price_ps5, ps5_price))
         if watch.platform in ("pc", "beide"):
             platforms.append(("pc", watch.last_price_pc, pc_price))
-        moves: list[PriceMove] = []
         stored = watch.as_player()
         player = None if not watch.name or watch.name in {"Unbekannt", str(watch.ea_id)} else stored
+        results: list[tuple[PriceMove, str]] = []
+        seen: set[Platform] = set()
         for platform, old, new in platforms:
+            move = self.market.watch_below_move(
+                watch.ea_id, platform, old, new, watch.target_below, player=player
+            )
+            if move:
+                results.append(
+                    (
+                        move,
+                        f"Beobachtung · Preis unter {format_coins(watch.target_below)}",
+                    )
+                )
+                seen.add(platform)
+        if watch.last_alert_at and now - watch.last_alert_at < cooldown_minutes * 60:
+            return results
+        for platform, old, new in platforms:
+            if platform in seen:
+                continue
             move = self.market.watch_move(
                 watch.ea_id,
                 platform,
@@ -638,8 +788,11 @@ class MarketCog(commands.Cog):
                 player=player,
             )
             if move:
-                moves.append(move)
-        return moves
+                reason = f"Manueller Watch · Schwelle {format_pct(watch.threshold_pct)}"
+                if watch.threshold_coins:
+                    reason += f" / {format_coins(watch.threshold_coins)}"
+                results.append((move, reason))
+        return results
 
     async def _hydrate_moves(self, moves: list[PriceMove]) -> None:
         await self.market.hydrate_moves(moves)

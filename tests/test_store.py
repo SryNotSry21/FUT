@@ -38,6 +38,35 @@ def test_watch_crud(tmp_path: Path) -> None:
     store.close()
 
 
+def test_target_below_watch_roundtrip(tmp_path: Path) -> None:
+    store = Store(tmp_path / "bot.db")
+    watch = store.add_watch(
+        1,
+        user_id=5,
+        player=_card(),
+        platform="ps5",
+        threshold_pct=0,
+        threshold_coins=None,
+        target_below=2_000_000,
+    )
+    assert watch.target_below == 2_000_000
+    again = store.get_user_watch(1, 5, 231747)
+    assert again is not None
+    assert again.target_below == 2_000_000
+    store.close()
+
+
+def test_percent_watch_can_add_target_below(tmp_path: Path) -> None:
+    store = Store(tmp_path / "bot.db")
+    store.add_watch(1, 5, _card(), "beide", threshold_pct=12, threshold_coins=None)
+    updated = store.add_watch(
+        1, 5, _card(), "beide", threshold_pct=12, threshold_coins=None, target_below=1_500_000
+    )
+    assert updated.threshold_pct == 12
+    assert updated.target_below == 1_500_000
+    store.close()
+
+
 def test_watch_does_not_steal_other_users_alert(tmp_path: Path) -> None:
     store = Store(tmp_path / "bot.db")
     store.add_watch(1, user_id=5, player=_card(), platform="beide", threshold_pct=10, threshold_coins=None)

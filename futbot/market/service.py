@@ -5,7 +5,14 @@ import time
 from collections.abc import Sequence
 from dataclasses import replace
 
-from futbot.market.compare import bargains_from_drops, is_significant_move, rank_movers, rank_platform_bargains
+from futbot.market.compare import (
+    bargains_from_drops,
+    crossed_below_target,
+    is_significant_move,
+    percent_change,
+    rank_movers,
+    rank_platform_bargains,
+)
 from futbot.market.futbin import FutbinClient
 from futbot.market.futgg import FutGGClient
 from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
@@ -224,6 +231,28 @@ class MarketService:
             new_price=new_price,
             delta=delta,
             pct=pct,
+            player=player,
+        )
+
+    def watch_below_move(
+        self,
+        ea_id: int,
+        platform: Platform,
+        old_price: int | None,
+        new_price: int | None,
+        target_below: int | None,
+        player: PlayerCard | None = None,
+    ) -> PriceMove | None:
+        if not crossed_below_target(old_price, new_price, target_below):
+            return None
+        assert old_price is not None and new_price is not None and target_below is not None
+        return PriceMove(
+            ea_id=ea_id,
+            platform=platform,
+            old_price=old_price,
+            new_price=new_price,
+            delta=new_price - old_price,
+            pct=percent_change(old_price, new_price),
             player=player,
         )
 

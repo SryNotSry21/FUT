@@ -11,6 +11,7 @@ Du kannst den Scanner **marktweit automatisch** laufen lassen und denselben Aler
 - Zwei Karten vergleichen, inklusive PS-vs-PC-Spread
 - Automatischer Markt-Scan: starke Pumps/Crashes ins Alert-Channel posten
 - `/watch`: Alert fest auf eine bestimmte Karte legen (eigene %- oder Coin-Schwelle)
+- `/beobachten`: Alert, wenn der Preis **unter einen Zielwert** fällt
 - `/alert`: denselben Alert sofort manuell auslösen, ohne auf die Schwelle zu warten
 - `/schnappchen`: Karten, die deutlich **unter dem anderen Plattform-Preis** oder unter dem **letzten Scan** liegen
 
@@ -27,8 +28,10 @@ Der Bot loggt sich **nicht** in EA-Accounts ein und handelt nicht auf dem Transf
 | `/suche` | Spieler suchen |
 | `/vergleichen` | Zwei Karten vergleichen |
 | `/watch` | Manuellen Alert für eine Karte setzen |
+| `/beobachten` | Alert, wenn der Preis unter einen Zielwert fällt |
 | `/unwatch` | Manuellen Alert entfernen |
 | `/watches` | Alle manuellen Alerts des Servers |
+| `/beobachtungen` | Beobachtungsliste (nur Zielpreis) |
 | `/alert` | Alert für eine Karte **jetzt** senden |
 | `/markt` | Momentum der letzten Stunden |
 | `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan) |
@@ -39,6 +42,7 @@ Typischer Ablauf:
 1. Bot einladen, in einem Channel `/setup kanal:#markt-alerts schwelle:10 auto_scan:True` ausführen.
 2. Danach scannt der Bot den Markt im Hintergrund und postet starke Bewegungen.
 3. Zusätzlich `/watch spieler:Mbappé schwelle_prozent:8` für Karten, die dir persönlich wichtig sind.
+4. Oder `/beobachten spieler:Mbappé unter:2000000` — Alert, sobald der Preis unter 2 Mio. fällt.
 
 ## Setup
 

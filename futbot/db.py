@@ -40,6 +40,7 @@ class Watch:
     last_price_pc: int | None
     last_alert_at: float | None
     created_at: float
+    target_below: int | None = None
 
     def as_player(self) -> PlayerCard:
         return PlayerCard(
@@ -100,6 +101,7 @@ class Store:
                 last_price_pc INTEGER,
                 last_alert_at REAL,
                 created_at REAL NOT NULL,
+                target_below INTEGER,
                 UNIQUE(guild_id, user_id, ea_id)
             );
 
@@ -116,6 +118,7 @@ class Store:
             """
         )
         self._migrate_watch_uniqueness()
+        self._migrate_target_below()
         self._conn.commit()
 
     def _migrate_watch_uniqueness(self) -> None:
@@ -168,6 +171,11 @@ class Store:
         self._conn.execute(
             "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('watch_unique', 'guild_user_ea')"
         )
+
+    def _migrate_target_below(self) -> None:
+        columns = {row[1] for row in self._conn.execute("PRAGMA table_info(watches)").fetchall()}
+        if "target_below" not in columns:
+            self._conn.execute("ALTER TABLE watches ADD COLUMN target_below INTEGER")
 
     def get_guild(self, guild_id: int) -> GuildSettings:
         row = self._conn.execute(
@@ -243,14 +251,16 @@ class Store:
         platform: WatchPlatform,
         threshold_pct: float,
         threshold_coins: int | None,
+        target_below: int | None = None,
     ) -> Watch:
         now = time.time()
         self._conn.execute(
             """
             INSERT INTO watches (
                 guild_id, user_id, ea_id, name, rating, position, rarity, club,
-                url, image_url, platform, threshold_pct, threshold_coins, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                url, image_url, platform, threshold_pct, threshold_coins,
+                target_below, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(guild_id, user_id, ea_id) DO UPDATE SET
                 name = excluded.name,
                 rating = excluded.rating,
@@ -261,7 +271,8 @@ class Store:
                 image_url = excluded.image_url,
                 platform = excluded.platform,
                 threshold_pct = excluded.threshold_pct,
-                threshold_coins = excluded.threshold_coins
+                threshold_coins = excluded.threshold_coins,
+                target_below = excluded.target_below
             """,
             (
                 guild_id,
@@ -277,6 +288,7 @@ class Store:
                 platform,
                 threshold_pct,
                 threshold_coins,
+                target_below,
                 now,
             ),
         )
@@ -408,4 +420,5 @@ def _watch_from_row(row: sqlite3.Row) -> Watch:
         last_price_pc=row["last_price_pc"],
         last_alert_at=row["last_alert_at"],
         created_at=row["created_at"],
+        target_below=row["target_below"] if "target_below" in row.keys() else None,
     )

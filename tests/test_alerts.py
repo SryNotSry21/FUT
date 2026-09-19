@@ -1,4 +1,4 @@
-from futbot.market.compare import is_significant_move, percent_change, rank_movers
+from futbot.market.compare import crossed_below_target, is_significant_move, percent_change, rank_movers
 
 
 def test_percent_change() -> None:
@@ -50,3 +50,12 @@ def test_rank_movers_splits_risers_and_fallers() -> None:
     assert [row[0] for row in risers] == [1]
     assert [row[0] for row in fallers] == [2]
     assert risers[0][3] == 50.0
+
+
+def test_crossed_below_target_only_on_way_down() -> None:
+    assert crossed_below_target(2_100_000, 1_900_000, 2_000_000) is True
+    assert crossed_below_target(1_900_000, 1_800_000, 2_000_000) is False
+    assert crossed_below_target(2_100_000, 2_050_000, 2_000_000) is False
+    assert crossed_below_target(None, 1_500_000, 2_000_000) is False
+    assert crossed_below_target(2_100_000, 2_000_000, 2_000_000) is True
+    assert crossed_below_target(2_100_000, 1_900_000, None) is False
