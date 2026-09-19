@@ -46,10 +46,12 @@ Typischer Ablauf:
 2. Bot-User erstellen, Token kopieren.
 3. OAuth2-Invite mit den Scopes `bot` und `applications.commands`.
 4. Rechte: Nachrichten senden, Embeds, Slash-Commands. Keine Message-Content-Intent nötig.
-5. Unter **App information → Legal** diese öffentlichen URLs eintragen:
+5. Unter **App information → Legal** öffentliche HTTPS-URLs eintragen (Discord muss die Seiten ohne Login öffnen können). Liegt das Repo öffentlich:
 
-   - Terms of Service: `https://github.com/SryNotSry21/FUT/blob/main/TERMS.md`
-   - Privacy Policy: `https://github.com/SryNotSry21/FUT/blob/main/PRIVACY.md`
+   - Terms of Service: https://github.com/SryNotSry21/FUT/blob/main/TERMS.md
+   - Privacy Policy: https://github.com/SryNotSry21/FUT/blob/main/PRIVACY.md
+
+   Ist das Repo privat, dieselben Dateien `TERMS.md` und `PRIVACY.md` als öffentlichen Gist oder eine andere öffentliche Seite spiegeln und diese URLs eintragen.
 
 ### 2. Bot starten
 
