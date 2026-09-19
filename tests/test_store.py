@@ -4,9 +4,9 @@ from futbot.db import Store
 from futbot.market.models import PlayerCard
 
 
-def _card() -> PlayerCard:
+def _card(ea_id: int = 231747) -> PlayerCard:
     return PlayerCard(
-        ea_id=231747,
+        ea_id=ea_id,
         name="Kylian Mbappé",
         rating=91,
         position="ST",
@@ -25,16 +25,31 @@ def test_watch_crud(tmp_path: Path) -> None:
     store.set_alert_channel(guild_id, 99)
     watch = store.add_watch(guild_id, user_id=5, player=_card(), platform="beide", threshold_pct=12, threshold_coins=50_000)
     assert watch.ea_id == 231747
-    assert store.get_watch(guild_id, 231747) is not None
+    assert store.get_user_watch(guild_id, 5, 231747) is not None
     listed = store.list_watches(guild_id)
     assert len(listed) == 1
     store.update_watch_prices(watch.id, 3_800_000, 4_000_000, alerted=True)
-    updated = store.get_watch(guild_id, 231747)
+    updated = store.get_user_watch(guild_id, 5, 231747)
     assert updated is not None
     assert updated.last_price_ps5 == 3_800_000
     assert updated.last_alert_at is not None
-    assert store.remove_watch(guild_id, 231747) is True
+    assert store.remove_watch(guild_id, 231747, user_id=5) == 1
     assert store.list_watches(guild_id) == []
+    store.close()
+
+
+def test_watch_does_not_steal_other_users_alert(tmp_path: Path) -> None:
+    store = Store(tmp_path / "bot.db")
+    store.add_watch(1, user_id=5, player=_card(), platform="beide", threshold_pct=10, threshold_coins=None)
+    store.add_watch(1, user_id=9, player=_card(), platform="ps5", threshold_pct=15, threshold_coins=None)
+    watches = store.find_watches(1, 231747)
+    assert {watch.user_id for watch in watches} == {5, 9}
+    assert store.get_user_watch(1, 5, 231747) is not None
+    assert store.get_user_watch(1, 9, 231747) is not None
+    assert store.remove_watch(1, 231747, user_id=9) == 1
+    remaining = store.find_watches(1, 231747)
+    assert len(remaining) == 1
+    assert remaining[0].user_id == 5
     store.close()
 
 

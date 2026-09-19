@@ -21,16 +21,29 @@ from futbot.formatting import (
 )
 from futbot.market.models import PlayerCard, Platform, PriceMove, WatchPlatform
 from futbot.market.service import MarketService
+from futbot.security import (
+    CooldownMap,
+    TtlCache,
+    cached_call,
+    can_manage_watch,
+    can_post_manual_alert,
+)
 
 logger = logging.getLogger(__name__)
 
 PlatformChoice = Literal["ps5", "pc", "beide"]
 
 
+def _is_guild_manager(interaction: discord.Interaction) -> bool:
+    perms = getattr(interaction.user, "guild_permissions", None)
+    return bool(perms and perms.manage_guild)
+
+
 class PlayerPickView(discord.ui.View):
-    def __init__(self, cards: list[PlayerCard], callback) -> None:
+    def __init__(self, cards: list[PlayerCard], callback, owner_id: int) -> None:
         super().__init__(timeout=60)
         self.callback_fn = callback
+        self.owner_id = owner_id
         options = [
             discord.SelectOption(
                 label=card.label[:100],
@@ -42,6 +55,15 @@ class PlayerPickView(discord.ui.View):
         self.select = discord.ui.Select(placeholder="Karte auswählen", options=options)
         self.select.callback = self._picked
         self.add_item(self.select)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "Nur wer den Befehl ausgeführt hat, kann die Karte auswählen.",
+            ephemeral=True,
+        )
+        return False
 
     async def _picked(self, interaction: discord.Interaction) -> None:
         ea_id = int(self.select.values[0])
@@ -56,6 +78,9 @@ class MarketCog(commands.Cog):
         self.store = store
         self.market = market
         self.poll_market.change_interval(seconds=settings.poll_interval_seconds)
+        self._search_cache = TtlCache(ttl_seconds=45)
+        self._autocomplete_cooldown = CooldownMap(seconds=2)
+        self._alert_cooldown = CooldownMap(seconds=60)
 
     async def cog_load(self) -> None:
         self.poll_market.start()
@@ -66,10 +91,16 @@ class MarketCog(commands.Cog):
     async def _autocomplete_player(
         self, interaction: discord.Interaction, current: str
     ) -> list[app_commands.Choice[str]]:
-        if len(current.strip()) < 2:
+        if len(current.strip()) < 3:
+            return []
+        if not self._autocomplete_cooldown.hit(interaction.user.id):
             return []
         try:
-            cards = await self.market.search(current, limit=20)
+            cards = await cached_call(
+                self._search_cache,
+                current.strip().lower(),
+                lambda: self.market.search(current, limit=8),
+            )
         except Exception:
             logger.exception("Autocomplete search failed")
             return []
@@ -100,7 +131,7 @@ class MarketCog(commands.Cog):
         await interaction.followup.send(
             "Mehrere Karten gefunden — bitte eine auswählen:",
             embed=search_embed(spieler, cards),
-            view=PlayerPickView(cards, picked),
+            view=PlayerPickView(cards, picked, owner_id=interaction.user.id),
         )
 
     @app_commands.command(name="suche", description="FC-27-Spieler über die FUT.GG-API suchen")
@@ -191,7 +222,7 @@ class MarketCog(commands.Cog):
         await interaction.followup.send(
             "Welche Karte soll überwacht werden?",
             embed=search_embed(spieler, cards),
-            view=PlayerPickView(cards, picked),
+            view=PlayerPickView(cards, picked, owner_id=interaction.user.id),
         )
 
     @app_commands.command(name="unwatch", description="Manuellen Preis-Alert für eine Karte entfernen")
@@ -202,40 +233,69 @@ class MarketCog(commands.Cog):
             await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
             return
         await interaction.response.defer(ephemeral=True)
+        manager = _is_guild_manager(interaction)
         cards = await self._lookup(spieler)
-        if not cards:
-            # allow removing by stored name
-            removed = False
-            for watch in self.store.list_watches(interaction.guild.id):
-                if spieler.lower() in watch.name.lower() or spieler == str(watch.ea_id):
-                    self.store.remove_watch(interaction.guild.id, watch.ea_id)
-                    removed = True
-                    await interaction.followup.send(f"Alert für **{watch.name}** entfernt.")
-                    break
-            if not removed:
+        ea_id: int | None = cards[0].ea_id if cards else None
+        if ea_id is None:
+            matches = [
+                watch
+                for watch in self.store.list_watches(interaction.guild.id)
+                if spieler.lower() in watch.name.lower() or spieler == str(watch.ea_id)
+            ]
+            if not matches:
                 await interaction.followup.send("Kein passender Alert gefunden.")
-            return
-        if self.store.remove_watch(interaction.guild.id, cards[0].ea_id):
-            await interaction.followup.send(f"Alert für **{cards[0].label}** entfernt.")
-        else:
+                return
+            ea_id = matches[0].ea_id
+        watches = self.store.find_watches(interaction.guild.id, ea_id)
+        if not watches:
             await interaction.followup.send("Diese Karte wurde nicht beobachtet.")
+            return
+        allowed = [
+            watch
+            for watch in watches
+            if can_manage_watch(
+                actor_id=interaction.user.id,
+                owner_id=watch.user_id,
+                is_guild_manager=manager,
+            )
+        ]
+        if not allowed:
+            await interaction.followup.send(
+                "Du kannst nur deine eigenen Alerts entfernen."
+            )
+            return
+        if manager:
+            removed = self.store.remove_watch(interaction.guild.id, ea_id)
+        else:
+            removed = self.store.remove_watch(
+                interaction.guild.id, ea_id, user_id=interaction.user.id
+            )
+        await interaction.followup.send(
+            f"{removed} Alert(s) für **{watches[0].name}** entfernt."
+        )
 
     @app_commands.command(name="watches", description="Alle manuellen Spieler-Alerts dieses Servers anzeigen")
     async def watches(self, interaction: discord.Interaction) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
             return
-        watches = self.store.list_watches(interaction.guild.id)
+        manager = _is_guild_manager(interaction)
+        watches = self.store.list_watches(
+            interaction.guild.id,
+            user_id=None if manager else interaction.user.id,
+        )
         if not watches:
             await interaction.response.send_message("Keine manuellen Alerts. Setze einen mit `/watch`.")
             return
         lines = []
         for watch in watches:
+            owner = f" · <@{watch.user_id}>" if manager else ""
             lines.append(
                 f"• **{watch.name}** {watch.rating} {watch.position} · {watch.platform} · "
                 f"{format_pct(watch.threshold_pct)}"
                 + (f" / {format_coins(watch.threshold_coins)}" if watch.threshold_coins else "")
                 + f" · PS {format_coins(watch.last_price_ps5)} · PC {format_coins(watch.last_price_pc)}"
+                + owner
             )
         embed = discord.Embed(title="Manuelle Alerts", description="\n".join(lines), color=0x2ECC71)
         await interaction.response.send_message(embed=embed)
@@ -250,14 +310,30 @@ class MarketCog(commands.Cog):
         if interaction.guild is None:
             await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
             return
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True)
+        wait = self._alert_cooldown.remaining(interaction.user.id)
+        if wait > 0:
+            await interaction.followup.send(
+                f"Bitte warte noch {int(wait) + 1}s, bevor du erneut `/alert` nutzt."
+            )
+            return
         cards = await self._lookup(spieler)
         if not cards:
             await interaction.followup.send("Karte nicht gefunden.")
             return
         card = cards[0]
         quote = await self.market.quote_player(card)
-        watch = self.store.get_watch(interaction.guild.id, card.ea_id)
+        watch = self.store.get_user_watch(interaction.guild.id, interaction.user.id, card.ea_id)
+        manager = _is_guild_manager(interaction)
+        if not can_post_manual_alert(
+            actor_id=interaction.user.id,
+            owner_id=watch.user_id if watch else None,
+            is_guild_manager=manager,
+        ):
+            await interaction.followup.send(
+                "Manuelle Alerts in den Kanal gehen nur für eigene `/watch`-Karten oder mit Server verwalten."
+            )
+            return
         old = watch.last_price_ps5 if watch else None
         new = quote.ps5.price
         if old is None or new is None:
@@ -288,8 +364,10 @@ class MarketCog(commands.Cog):
         )
         if channel and channel.id != interaction.channel_id:
             await channel.send(embed=embed)
+            self._alert_cooldown.hit(interaction.user.id)
             await interaction.followup.send("Alert wurde in den Alert-Kanal gesendet.", embed=embed)
         else:
+            self._alert_cooldown.hit(interaction.user.id)
             await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="markt", description="Aktuelle starke Marktbewegungen (FUT.GG Momentum)")

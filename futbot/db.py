@@ -100,7 +100,12 @@ class Store:
                 last_price_pc INTEGER,
                 last_alert_at REAL,
                 created_at REAL NOT NULL,
-                UNIQUE(guild_id, ea_id)
+                UNIQUE(guild_id, user_id, ea_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS schema_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS market_state (
@@ -110,7 +115,59 @@ class Store:
             );
             """
         )
+        self._migrate_watch_uniqueness()
         self._conn.commit()
+
+    def _migrate_watch_uniqueness(self) -> None:
+        row = self._conn.execute(
+            "SELECT value FROM schema_meta WHERE key = 'watch_unique'"
+        ).fetchone()
+        if row and row["value"] == "guild_user_ea":
+            return
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS watches_v2 (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                guild_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
+                ea_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                rating INTEGER NOT NULL DEFAULT 0,
+                position TEXT NOT NULL DEFAULT '',
+                rarity TEXT NOT NULL DEFAULT '',
+                club TEXT NOT NULL DEFAULT '',
+                url TEXT NOT NULL DEFAULT '',
+                image_url TEXT NOT NULL DEFAULT '',
+                platform TEXT NOT NULL DEFAULT 'beide',
+                threshold_pct REAL NOT NULL DEFAULT 10,
+                threshold_coins INTEGER,
+                last_price_ps5 INTEGER,
+                last_price_pc INTEGER,
+                last_alert_at REAL,
+                created_at REAL NOT NULL,
+                UNIQUE(guild_id, user_id, ea_id)
+            )
+            """
+        )
+        self._conn.execute(
+            """
+            INSERT OR IGNORE INTO watches_v2 (
+                id, guild_id, user_id, ea_id, name, rating, position, rarity, club,
+                url, image_url, platform, threshold_pct, threshold_coins,
+                last_price_ps5, last_price_pc, last_alert_at, created_at
+            )
+            SELECT
+                id, guild_id, user_id, ea_id, name, rating, position, rarity, club,
+                url, image_url, platform, threshold_pct, threshold_coins,
+                last_price_ps5, last_price_pc, last_alert_at, created_at
+            FROM watches
+            """
+        )
+        self._conn.execute("DROP TABLE watches")
+        self._conn.execute("ALTER TABLE watches_v2 RENAME TO watches")
+        self._conn.execute(
+            "INSERT OR REPLACE INTO schema_meta(key, value) VALUES ('watch_unique', 'guild_user_ea')"
+        )
 
     def get_guild(self, guild_id: int) -> GuildSettings:
         row = self._conn.execute(
@@ -194,8 +251,7 @@ class Store:
                 guild_id, user_id, ea_id, name, rating, position, rarity, club,
                 url, image_url, platform, threshold_pct, threshold_coins, created_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(guild_id, ea_id) DO UPDATE SET
-                user_id = excluded.user_id,
+            ON CONFLICT(guild_id, user_id, ea_id) DO UPDATE SET
                 name = excluded.name,
                 rating = excluded.rating,
                 position = excluded.position,
@@ -225,30 +281,56 @@ class Store:
             ),
         )
         self._conn.commit()
-        watch = self.get_watch(guild_id, player.ea_id)
+        watch = self.get_user_watch(guild_id, user_id, player.ea_id)
         assert watch is not None
         return watch
 
     def get_watch(self, guild_id: int, ea_id: int) -> Watch | None:
         row = self._conn.execute(
-            "SELECT * FROM watches WHERE guild_id = ? AND ea_id = ?",
+            "SELECT * FROM watches WHERE guild_id = ? AND ea_id = ? ORDER BY id LIMIT 1",
             (guild_id, ea_id),
         ).fetchone()
         return _watch_from_row(row) if row else None
 
-    def remove_watch(self, guild_id: int, ea_id: int) -> bool:
-        cursor = self._conn.execute(
-            "DELETE FROM watches WHERE guild_id = ? AND ea_id = ?",
-            (guild_id, ea_id),
-        )
-        self._conn.commit()
-        return cursor.rowcount > 0
+    def get_user_watch(self, guild_id: int, user_id: int, ea_id: int) -> Watch | None:
+        row = self._conn.execute(
+            "SELECT * FROM watches WHERE guild_id = ? AND user_id = ? AND ea_id = ?",
+            (guild_id, user_id, ea_id),
+        ).fetchone()
+        return _watch_from_row(row) if row else None
 
-    def list_watches(self, guild_id: int) -> list[Watch]:
+    def find_watches(self, guild_id: int, ea_id: int) -> list[Watch]:
         rows = self._conn.execute(
-            "SELECT * FROM watches WHERE guild_id = ? ORDER BY name",
-            (guild_id,),
+            "SELECT * FROM watches WHERE guild_id = ? AND ea_id = ?",
+            (guild_id, ea_id),
         ).fetchall()
+        return [_watch_from_row(row) for row in rows]
+
+    def remove_watch(self, guild_id: int, ea_id: int, user_id: int | None = None) -> int:
+        if user_id is None:
+            cursor = self._conn.execute(
+                "DELETE FROM watches WHERE guild_id = ? AND ea_id = ?",
+                (guild_id, ea_id),
+            )
+        else:
+            cursor = self._conn.execute(
+                "DELETE FROM watches WHERE guild_id = ? AND ea_id = ? AND user_id = ?",
+                (guild_id, ea_id, user_id),
+            )
+        self._conn.commit()
+        return cursor.rowcount
+
+    def list_watches(self, guild_id: int, user_id: int | None = None) -> list[Watch]:
+        if user_id is None:
+            rows = self._conn.execute(
+                "SELECT * FROM watches WHERE guild_id = ? ORDER BY name",
+                (guild_id,),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM watches WHERE guild_id = ? AND user_id = ? ORDER BY name",
+                (guild_id, user_id),
+            ).fetchall()
         return [_watch_from_row(row) for row in rows]
 
     def all_watches(self) -> list[Watch]:
