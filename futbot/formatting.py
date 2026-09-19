@@ -130,37 +130,26 @@ def movers_embed(
 
 
 def bargains_embed(
-    market_deals: list[Bargain],
+    deals: list[Bargain],
     extra_lines: list[str] | None = None,
-    year_deals: list[Bargain] | None = None,
     previous_game_year: int | None = None,
 ) -> discord.Embed:
+    year = previous_game_year or 26
     embed = discord.Embed(
-        title="PlayStation-Schnäppchen",
+        title="Schnapper · PlayStation",
         color=NEUTRAL_COLOR,
         timestamp=datetime.now(timezone.utc),
         description="\n".join(
             extra_lines
             or [
                 "Nur PlayStation-Preise von FUT.GG.",
-                "Kein EA-Transfermarkt — keine einzelnen Snipes.",
-                "Vergleich: letzter PS-Scan oder Vorjahrespreis.",
+                f"Fairer Wert = höherer Preis aus letztem Scan und FC {year} (gleiche Karte/ähnliches Overall).",
             ]
         ),
     )
     embed.add_field(
-        name="Unter dem letzten PlayStation-Preis",
-        value=_bargain_list(market_deals) or "Keine",
-        inline=False,
-    )
-    year_label = (
-        f"Günstiger als FC {previous_game_year}"
-        if previous_game_year
-        else "Günstiger als letztes Jahr"
-    )
-    embed.add_field(
-        name=year_label,
-        value=_bargain_list(year_deals or []) or "Keine",
+        name="Unter Marktwert",
+        value=_bargain_list(deals) or "Keine",
         inline=False,
     )
     embed.set_footer(text=FOOTER)
@@ -232,10 +221,13 @@ def format_bargain_line(deal: Bargain) -> str:
         f"▼ {format_coin_amount(deal.fair_price)} → {format_coin_amount(deal.cheap_price)} Coins "
         f"({format_pct(-deal.pct_below)})"
     )
-    if deal.reason == "vorjahr":
-        return f"**{bargain_display_name(deal)}** {path} · vs letztes Jahr"
-    return f"**{bargain_display_name(deal)}** {path}"
+    why = {
+        "vorjahr": "vs FC 26",
+        "beides": "letzter Scan + FC 26",
+        "markt": "letzter Scan",
+    }.get(deal.reason, "letzter Scan")
+    return f"**{bargain_display_name(deal)}** {path} · {why}"
 
 
 def _bargain_list(deals: list[Bargain]) -> str:
-    return "\n".join(format_bargain_line(deal) for deal in deals[:8])
+    return "\n".join(format_bargain_line(deal) for deal in deals[:10])

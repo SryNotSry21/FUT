@@ -1,7 +1,10 @@
 from futbot.market.compare import (
     bargains_from_drops,
+    comparable_year_card,
+    finalize_ps_bargain,
     is_same_player_card,
     rank_platform_bargains,
+    rank_ps_bargains,
     rank_year_bargains,
 )
 from futbot.formatting import bargains_embed, format_bargain_line
@@ -95,6 +98,7 @@ def test_bargain_line_shows_fair_to_cheap_not_delta() -> None:
     text = format_bargain_line(deal)
     assert "Laura Georges" in text
     assert "1.000.000 → 215.000 Coins" in text
+    assert "letzter Scan" in text
     assert "PC" not in text
     assert "785.000" not in text
 
@@ -142,6 +146,124 @@ def test_same_player_card_rejects_reused_id() -> None:
     assert is_same_player_card(promo, None) is False
 
 
+def test_comparable_year_card_requires_similar_overall() -> None:
+    weak = PlayerCard(
+        ea_id=50573369,
+        name="Rafael Leão",
+        rating=83,
+        position="LW",
+        rarity="Rare",
+        club="",
+        nation="",
+        league="",
+        url="",
+        image_url="",
+        base_player_ea_id=241721,
+    )
+    last = PlayerCard(
+        ea_id=50573369,
+        name="Rafael Leão",
+        rating=86,
+        position="ST",
+        rarity="Ultimate Scream",
+        club="",
+        nation="",
+        league="",
+        url="",
+        image_url="",
+        base_player_ea_id=241721,
+    )
+    same = _card(246863, "Felix Nmecha", base=246863)
+    last_same = PlayerCard(
+        ea_id=246863,
+        name="Felix Nmecha",
+        rating=86,
+        position="CDM",
+        rarity="UCL",
+        club="",
+        nation="",
+        league="",
+        url="",
+        image_url="",
+        base_player_ea_id=246863,
+    )
+    assert comparable_year_card(weak, last) is False
+    assert comparable_year_card(same, last_same) is True
+
+
+def test_rank_ps_bargains_uses_higher_of_scan_and_year() -> None:
+    deals = rank_ps_bargains(
+        current={10: 200_000, 11: 400_000},
+        last_scan={10: 280_000, 11: 410_000},
+        last_year={10: 500_000},
+        min_price=15_000,
+        min_pct=20,
+        min_delta=20_000,
+    )
+    by_id = {deal.ea_id: deal for deal in deals}
+    assert 10 in by_id
+    assert by_id[10].fair_price == 500_000
+    assert by_id[10].reason == "beides"
+    assert 11 not in by_id
+
+
+def test_rank_ps_bargains_drops_extreme_year_ratio() -> None:
+    deals = rank_ps_bargains(
+        current={12: 40_000},
+        last_scan={},
+        last_year={12: 650_000},
+        min_price=15_000,
+        min_pct=20,
+        min_delta=20_000,
+    )
+    assert deals == []
+
+
+def test_finalize_drops_weaker_year_card_and_keeps_scan() -> None:
+    deal = Bargain(
+        ea_id=1,
+        cheap_platform="ps5",
+        cheap_price=200_000,
+        fair_platform="ps5",
+        fair_price=500_000,
+        pct_below=60.0,
+        reason="beides",
+        scan_fair=300_000,
+        year_fair=500_000,
+    )
+    current = PlayerCard(
+        ea_id=1,
+        name="Test",
+        rating=83,
+        position="ST",
+        rarity="Rare",
+        club="",
+        nation="",
+        league="",
+        url="",
+        image_url="",
+        base_player_ea_id=1,
+    )
+    previous = PlayerCard(
+        ea_id=1,
+        name="Test",
+        rating=88,
+        position="ST",
+        rarity="TOTS",
+        club="",
+        nation="",
+        league="",
+        url="",
+        image_url="",
+        base_player_ea_id=1,
+    )
+    kept = finalize_ps_bargain(deal, current, previous, min_pct=20, min_delta=20_000)
+    assert kept is not None
+    assert kept.reason == "markt"
+    assert kept.fair_price == 300_000
+    assert kept.year_fair is None
+
+
 def test_year_bargain_line_and_embed_mention_last_year() -> None:
     deal = Bargain(
         ea_id=209331,
@@ -156,9 +278,8 @@ def test_year_bargain_line_and_embed_mention_last_year() -> None:
     text = format_bargain_line(deal)
     assert "Mohamed Salah" in text
     assert "610.000 → 150.000 Coins" in text
-    assert "vs letztes Jahr" in text
-    embed = bargains_embed([], year_deals=[deal], previous_game_year=26)
-    names = [field.name for field in embed.fields]
-    assert "Günstiger als FC 26" in names
-    assert "Mohamed Salah" in embed.fields[-1].value
-    assert "Günstiger als die andere Plattform" not in names
+    assert "vs FC 26" in text
+    embed = bargains_embed([deal], previous_game_year=26)
+    assert embed.title and "Schnapper" in embed.title
+    assert "Mohamed Salah" in embed.fields[0].value
+    assert "Günstiger als die andere Plattform" not in embed.fields[0].name

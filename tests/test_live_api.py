@@ -108,7 +108,7 @@ async def test_live_year_bargains_use_previous_season() -> None:
         await market.aclose()
     if not deals:
         pytest.skip("no year-over-year bargains at the current thresholds")
-    assert all(deal.reason == "vorjahr" for deal in deals)
+    assert all(deal.reason in {"vorjahr", "beides", "markt"} for deal in deals)
     assert all(deal.player and deal.player.name != "Unbekannt" for deal in deals)
     assert all(deal.cheap_price < deal.fair_price for deal in deals)
 

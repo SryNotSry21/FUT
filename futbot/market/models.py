@@ -5,7 +5,7 @@ from typing import Literal
 
 Platform = Literal["ps5", "pc"]
 WatchPlatform = Literal["ps5", "pc", "beide"]
-BargainReason = Literal["plattform", "markt", "vorjahr"]
+BargainReason = Literal["plattform", "markt", "vorjahr", "beides"]
 
 STATUS_ON_MARKET = 0
 STATUS_SBC = 1
@@ -88,6 +88,8 @@ class Bargain:
     pct_below: float
     reason: BargainReason
     player: PlayerCard | None = None
+    scan_fair: int | None = None
+    year_fair: int | None = None
 
     @property
     def delta(self) -> int:

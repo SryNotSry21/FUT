@@ -533,43 +533,35 @@ class MarketCog(commands.Cog):
             )
 
     @app_commands.command(
-        name="schnappchen",
-        description="PlayStation-Karten unter Marktwert: letzter Scan oder Vorjahrespreis",
+        name="schnapper",
+        description="PlayStation-Schnapper: unter letztem Scan oder Vorjahrespreis",
     )
     @app_commands.describe(
         min_prozent="Mindest-Abstand zum Vergleichspreis",
         min_preis="Mindestpreis der günstigen Seite",
     )
-    async def schnappchen(
+    async def schnapper(
         self,
         interaction: discord.Interaction,
         min_prozent: app_commands.Range[float, 10, 80] = 20.0,
         min_preis: app_commands.Range[int, 1000, 500_000] = 15_000,
     ) -> None:
         await interaction.response.defer()
-        previous = self.store.load_snapshot("ps5")
-        market_deals = await self.market.below_recent_bargains(
-            previous,
-            "ps5",
+        deals = await self.market.schnapper_deals(
+            self.store.load_snapshot("ps5"),
             min_price=int(min_preis),
             min_pct=float(min_prozent),
-            limit=8,
-        )
-        year_deals = await self.market.year_bargains(
-            min_price=int(min_preis),
-            min_pct=float(min_prozent),
-            limit=8,
+            limit=10,
         )
         previous_year = self.market.game_year - 1
         await interaction.followup.send(
             embed=bargains_embed(
-                market_deals,
+                deals,
                 extra_lines=[
-                    "Nur PlayStation-Preise. Kein EA-Transfermarkt — einzelne Auktionen sieht der Bot nicht.",
-                    "Vergleich: letzter PS-Scan oder Vorjahres-PlayStation-Preis.",
+                    "Nur PlayStation. Fairer Wert = der höhere Preis aus letztem Scan und Vorjahr.",
+                    "Vorjahr zählt nur bei gleichem Spieler und ähnlichem Overall.",
                     f"Schwelle {format_pct(float(min_prozent))} · ab {format_coins(int(min_preis))}",
                 ],
-                year_deals=year_deals,
                 previous_game_year=previous_year,
             )
         )
@@ -634,7 +626,7 @@ class MarketCog(commands.Cog):
                 "`/beobachtungen` Beobachtungsliste (Zielpreis)\n"
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
-                "`/schnappchen` PlayStation unter Marktwert / Vorjahr\n"
+                "`/schnapper` PlayStation unter Marktwert\n"
                 "`/datenschutz` Datenschutzerklärung"
             ),
             inline=False,

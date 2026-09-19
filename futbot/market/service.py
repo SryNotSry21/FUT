@@ -9,12 +9,12 @@ from dataclasses import replace
 from futbot.market.compare import (
     bargains_from_drops,
     crossed_below_target,
-    is_same_player_card,
+    finalize_ps_bargain,
     is_significant_move,
     percent_change,
     rank_movers,
     rank_platform_bargains,
-    rank_year_bargains,
+    rank_ps_bargains,
 )
 from futbot.market.futgg import FutGGClient
 from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
@@ -218,45 +218,64 @@ class MarketService:
         await self.hydrate_bargains(deals)
         return deals
 
+    async def schnapper_deals(
+        self,
+        last_scan: dict[int, int],
+        min_price: int = 15_000,
+        min_pct: float = 20.0,
+        limit: int = 10,
+    ) -> list[Bargain]:
+        catalog = await self.catalog()
+        previous = await self.previous_catalog()
+        last_year = previous.snapshot("ps5") if previous else {}
+        deals = rank_ps_bargains(
+            catalog.snapshot("ps5"),
+            last_scan,
+            last_year,
+            min_price=min_price,
+            min_pct=min_pct,
+            limit=max(limit * 6, 24),
+        )
+        if not deals:
+            return []
+        ids = [deal.ea_id for deal in deals]
+        current_cards = await self.players_by_ids(ids)
+        year_ids = [deal.ea_id for deal in deals if deal.year_fair]
+        previous_cards: dict[int, PlayerCard] = {}
+        if year_ids and previous is not None:
+            try:
+                previous_cards = await self.futgg.get_players(year_ids, game_year=previous.game_year)
+            except Exception:
+                logger.warning("Previous-year player lookup failed", exc_info=True)
+        kept: list[Bargain] = []
+        for deal in deals:
+            current = current_cards.get(deal.ea_id)
+            if current is None:
+                continue
+            finalized = finalize_ps_bargain(
+                deal,
+                current,
+                previous_cards.get(deal.ea_id),
+                min_pct=min_pct,
+                min_delta=20_000,
+            )
+            if finalized:
+                kept.append(finalized)
+        kept.sort(
+            key=lambda item: (
+                (item.fair_price - item.cheap_price) * (item.pct_below ** 0.5)
+            ),
+            reverse=True,
+        )
+        return kept[:limit]
+
     async def year_bargains(
         self,
         min_price: int = 15_000,
         min_pct: float = 20.0,
         limit: int = 8,
     ) -> list[Bargain]:
-        previous = await self.previous_catalog()
-        if previous is None:
-            return []
-        catalog = await self.catalog()
-        deals = rank_year_bargains(
-            catalog.snapshot("ps5"),
-            {},
-            previous.snapshot("ps5"),
-            {},
-            min_price=min_price,
-            min_pct=min_pct,
-            limit=max(limit * 4, 16),
-        )
-        if not deals:
-            return []
-        ids = [deal.ea_id for deal in deals]
-        current_cards = await self.players_by_ids(ids)
-        try:
-            previous_cards = await self.futgg.get_players(ids, game_year=previous.game_year)
-        except Exception:
-            logger.warning("Previous-year player lookup failed", exc_info=True)
-            previous_cards = {}
-        kept: list[Bargain] = []
-        for deal in deals:
-            current = current_cards.get(deal.ea_id)
-            if current is None:
-                continue
-            if not is_same_player_card(current, previous_cards.get(deal.ea_id)):
-                continue
-            kept.append(replace(deal, player=current))
-            if len(kept) >= limit:
-                break
-        return kept
+        return await self.schnapper_deals({}, min_price=min_price, min_pct=min_pct, limit=limit)
 
     async def below_recent_bargains(
         self,
