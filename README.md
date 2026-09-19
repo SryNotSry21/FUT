@@ -36,6 +36,7 @@ Der Bot loggt sich **nicht** in EA-Accounts ein und handelt nicht auf dem Transf
 | `/markt` | Momentum der letzten Stunden |
 | `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan) |
 | `/hilfe` | Kurzanleitung |
+| `/datenschutz` | Datenschutzerklärung |
 
 Typischer Ablauf:
 

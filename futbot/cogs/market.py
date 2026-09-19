@@ -21,6 +21,7 @@ from futbot.formatting import (
     player_embed,
     search_embed,
 )
+from futbot.legal import privacy_embed
 from futbot.market.models import PlayerCard, Platform, PriceMove, WatchPlatform
 from futbot.market.service import MarketService
 from futbot.security import (
@@ -639,11 +640,19 @@ class MarketCog(commands.Cog):
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
                 "`/schnappchen` unter Marktwert / günstige Plattform\n"
+                "`/datenschutz` Datenschutzerklärung\n"
                 "`/setup` Alert-Kanal (Admin)"
             ),
             inline=False,
         )
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(
+        name="datenschutz",
+        description="Datenschutzerklärung des EA FC 27 Markt-Bots von 21Drehen",
+    )
+    async def datenschutz(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(embed=privacy_embed())
 
     async def _lookup(self, query: str) -> list[PlayerCard]:
         query = query.strip()

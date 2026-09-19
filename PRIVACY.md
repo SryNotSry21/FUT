@@ -1,136 +1,89 @@
-# Privacy Policy / Datenschutzerklärung
+# Datenschutzerklärung
 
 **EA FC 27 Markt-Bot von 21Drehen**
 
-Last updated / Stand: 19 September 2026
+Stand: 19. September 2026
 
-This policy explains what the Discord application **EA FC 27 Markt-Bot von 21Drehen** (the “Bot”), operated by **21Drehen**, stores when you use it. It supplements the [Terms of Service](TERMS.md).
+Diese Datenschutzerklärung informiert, welche personenbezogenen Daten die Discord-Anwendung **EA FC 27 Markt-Bot von 21Drehen** (der „Bot“) verarbeitet. Betreiber: **21Drehen**.
 
-Diese Erklärung beschreibt, welche Daten die Discord-Anwendung **EA FC 27 Markt-Bot von 21Drehen** (der „Bot“), betrieben von **21Drehen**, bei der Nutzung speichert. Sie ergänzt die [Nutzungsbedingungen](TERMS.md).
+Sie gilt ergänzend zu den [Nutzungsbedingungen](TERMS.md) und zu den Datenschutzhinweisen von [Discord](https://discord.com/privacy).
 
 ---
 
-## 1. Controller / Verantwortlicher
+## 1. Verantwortlicher
 
 **21Drehen**  
-Contact / Kontakt: [GitHub Issues](https://github.com/SryNotSry21/FUT/issues)
+Kontakt: [GitHub Issues — SryNotSry21/FUT](https://github.com/SryNotSry21/FUT/issues)
 
 ---
 
-## 2. Data we store / Welche Daten gespeichert werden
+## 2. Welche Daten verarbeitet werden
 
-The Bot only stores what is needed to run commands and alerts:
-
-Der Bot speichert nur, was für Befehle und Alerts nötig ist:
-
-| Data | Purpose |
-|---|---|
-| Discord user ID | Owner of a `/watch` alert; mention when it fires |
-| Discord server (guild) ID | Scope watches and `/setup` to that server |
-| Discord channel ID | Alert channel chosen with `/setup` |
-| Player / card watch settings | EA card ID, name, platform, thresholds, last seen prices |
-| Market price snapshots | Compare current prices with the previous scan (no Discord user attached) |
+Der Bot speichert nur, was für Slash-Befehle und Preis-Alerts nötig ist:
 
 | Daten | Zweck |
 |---|---|
-| Discord-Nutzer-ID | Inhaber eines `/watch`-Alerts; Erwähnung beim Auslösen |
-| Discord-Server-ID (Guild) | Watches und `/setup` auf diesen Server begrenzen |
+| Discord-Nutzer-ID | Inhaber von `/watch` und `/beobachten`; Erwähnung (`@Nutzer`) beim Alert |
+| Discord-Server-ID | Einstellungen und Alerts auf diesen Server begrenzen |
 | Discord-Kanal-ID | Alert-Kanal aus `/setup` |
-| Watch-Einstellungen | EA-Karten-ID, Name, Plattform, Schwellen, letzte Preise |
-| Markt-Preis-Snapshots | Aktuelle Preise mit dem letzten Scan vergleichen (ohne Nutzerbezug) |
+| Beobachtungs- und Watch-Einstellungen | EA-Karten-ID, Spielername, Plattform, %-Schwelle, optional Zielpreis („unter X Coins“), letzte bekannte Preise |
+| Markt-Preis-Snapshots | Aktuelle FUT.GG-Preise mit dem letzten Scan vergleichen (ohne Nutzerbezug) |
 
-The Bot does **not** request the Message Content Intent. It does **not** store Discord message text, e-mail addresses, IP addresses, payment data or **EA account credentials**. There is no EA login.
-
-Der Bot fordert **keinen** Message-Content-Intent an. Er speichert **keine** Discord-Nachrichtentexte, E-Mail-Adressen, IP-Adressen, Zahlungsdaten oder **EA-Zugangsdaten**. Es gibt keinen EA-Login.
+Der Bot fordert **keinen** Message-Content-Intent an. Er speichert **keine** Discord-Nachrichtentexte, keine E-Mail-Adressen, keine IP-Adressen, keine Zahlungsdaten und **keine EA-Zugangsdaten**. Es gibt **keinen EA-Login**.
 
 ---
 
-## 3. Legal basis / Rechtsgrundlage
+## 3. Zwecke und Rechtsgrundlagen
 
-Processing is required to provide the Bot you invited or used (contract / requested service) and to operate a stable, abuse-resistant app (legitimate interest).
+- Bereitstellung des Bots, den du einlädst oder per Slash-Befehl nutzt (Art. 6 Abs. 1 lit. b DSGVO — Vertrag / angeforderte Leistung).
+- Zustellung von Alerts, Missbrauchsschutz, Stabilität (Art. 6 Abs. 1 lit. f DSGVO — berechtigtes Interesse).
 
-Die Verarbeitung ist erforderlich, um den Bot bereitzustellen, den du eingeladen oder genutzt hast (Vertrag / angeforderte Leistung), und um den Dienst stabil und missbrauchsarm zu betreiben (berechtigtes Interesse).
-
----
-
-## 4. Where data is processed / Wo Daten verarbeitet werden
-
-Watch settings and snapshots are stored in a local SQLite database on the machine that runs the Bot. Discord delivers slash commands and receives the Bot’s replies through Discord’s infrastructure.
-
-Watch-Einstellungen und Snapshots liegen in einer lokalen SQLite-Datenbank auf dem Rechner, der den Bot ausführt. Discord übermittelt Slash-Befehle und die Antworten des Bots über die Discord-Infrastruktur.
-
-Player search and prices are requested from public market APIs (currently FUT.GG / their CDN). Those requests contain **player names or card IDs**, not your Discord user ID.
-
-Spieler- und Preisanfragen gehen an öffentliche Markt-APIs (derzeit FUT.GG / deren CDN). Diese Anfragen enthalten **Spielernamen oder Karten-IDs**, nicht deine Discord-Nutzer-ID.
+Es findet **kein** Profiling zu Werbezwecken und **kein** Verkauf von Daten statt.
 
 ---
 
-## 5. Retention / Speicherdauer
+## 4. Empfänger und Drittland
 
-- Watches stay until you or a server admin remove them (`/unwatch`) or the Bot is removed from the server and data is deleted by the operator.
-- Price snapshots are overwritten by later scans.
-- Discord may retain message/command logs according to Discord’s own policy.
+- **Discord Inc.** übermittelt Slash-Befehle und Bot-Antworten (Discord-Infrastruktur, u. a. USA). Es gelten Discords Bedingungen und Standardvertragsklauseln, soweit Discord sie nutzt.
+- **FUT.GG** (und deren CDN) erhalten nur Spielernamen oder Karten-IDs für Preisabfragen — **nicht** deine Discord-Nutzer-ID.
+- Ein **Hoster** des Bots, falls die SQLite-Datei dort liegt.
+- **Behörden**, wenn rechtlich vorgeschrieben.
 
-- Watches bleiben, bis du oder ein Admin sie entfernen (`/unwatch`) oder der Bot vom Server entfernt und die Daten vom Betreiber gelöscht werden.
+---
+
+## 5. Speicherdauer
+
+- Watches und Beobachtungen bleiben, bis du sie mit `/unwatch` löschst, ein Admin sie entfernt oder der Bot vom Server genommen und die Daten vom Betreiber gelöscht werden.
 - Preis-Snapshots werden durch spätere Scans überschrieben.
-- Discord kann Nachrichten-/Command-Logs nach eigenen Regeln speichern.
+- Discord kann Interaktionsprotokolle nach eigenen Regeln speichern.
 
 ---
 
-## 6. Sharing / Weitergabe
+## 6. Deine Rechte
 
-We do not sell personal data. Data is only shared with:
+Soweit die DSGVO gilt, hast du das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO) sowie das Recht, dich bei einer Aufsichtsbehörde zu beschweren.
 
-Personenbezogene Daten werden nicht verkauft. Weitergabe nur an:
+Praktisch im Bot:
 
-- **Discord**, as required to run a Discord app
-- **Hosting** of the Bot, if a host processes the database
-- **Authorities**, if legally required
-
-- **Discord**, soweit für eine Discord-App nötig
-- **Hosting** des Bots, falls ein Hoster die Datenbank verarbeitet
-- **Behörden**, wenn rechtlich vorgeschrieben
+- `/unwatch` — eigene Alerts/Beobachtungen löschen
+- `/watches` / `/beobachtungen` — gespeicherte Einträge ansehen
+- Bot vom Server kicken — Verarbeitung auf diesem Server beenden
+- GitHub-Issue — Löschung restlicher Einträge beim Betreiber verlangen
 
 ---
 
-## 7. Your rights / Deine Rechte
+## 7. Minderjährige
 
-Depending on applicable law (including GDPR if it applies), you may request access, correction, deletion or restriction of stored data about you.
-
-Je nach geltendem Recht (einschließlich DSGVO, soweit anwendbar) kannst du Auskunft, Berichtigung, Löschung oder Einschränkung der zu dir gespeicherten Daten verlangen.
-
-Practical options:
-
-Praktisch:
-
-- `/unwatch` removes your watch for a card
-- `/watches` shows watches stored for you on that server
-- Kick or ban the Bot from a server to stop processing there
-- Open a GitHub issue to ask the operator to delete remaining records
-
-- `/unwatch` entfernt deinen Watch für eine Karte
-- `/watches` zeigt deine gespeicherten Watches auf dem Server
-- Kick/Ban des Bots beendet die Verarbeitung auf diesem Server
-- GitHub-Issue, wenn der Betreiber restliche Einträge löschen soll
+Der Bot richtet sich an Personen, die Discord nutzen dürfen, nicht an Kinder unter 13 Jahren (oder dem höheren Mindestalter in deinem Land).
 
 ---
 
-## 8. Children / Minderjährige
-
-The Bot is meant for users who are allowed to use Discord. It is not directed at children under 13 (or the higher age required in your country).
-
-Der Bot richtet sich an Personen, die Discord nutzen dürfen, nicht an Kinder unter 13 Jahren (oder dem höheren Alter in deinem Land).
-
----
-
-## 9. Changes / Änderungen
-
-This policy may be updated at this URL. The “last updated” date above will change when it does.
+## 8. Änderungen
 
 Diese Erklärung kann unter dieser URL aktualisiert werden. Das Datum oben wird dann angepasst.
 
 ---
 
-## 10. Contact / Kontakt
+## English summary
 
-[GitHub Issues — SryNotSry21/FUT](https://github.com/SryNotSry21/FUT/issues)
+The unofficial Discord app **EA FC 27 Markt-Bot von 21Drehen** (operator: 21Drehen) stores Discord user/server/channel IDs and watch settings (including optional target prices) so alerts can be delivered. It does not read message content, does not collect EA logins, and does not sell data. Market lookups to FUT.GG use player names or card IDs only. You can delete watches with `/unwatch` or contact the operator via GitHub issues.
