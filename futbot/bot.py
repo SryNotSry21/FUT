@@ -53,6 +53,10 @@ class FutBot(commands.Bot):
             logger.info("Connected to %s guild(s): %s", len(guilds), ", ".join(g.name for g in guilds))
         else:
             logger.warning("Bot is not in any Discord server yet. Use the invite URL above.")
+        for guild in guilds:
+            self.tree.copy_global_to(guild=guild)
+            synced = await self.tree.sync(guild=guild)
+            logger.info("Synced %s commands to %s", len(synced), guild.name)
         await self.change_presence(
             activity=discord.Activity(
                 type=discord.ActivityType.watching,
