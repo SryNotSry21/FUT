@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+*.log
+*.tsbuildinfo
+coverage/
+.DS_Store
+.idea/
+.vscode/
+npm-debug.log*
