@@ -141,6 +141,8 @@ def bargains_embed(
     platform_deals: list[Bargain],
     market_deals: list[Bargain],
     extra_lines: list[str] | None = None,
+    year_deals: list[Bargain] | None = None,
+    previous_game_year: int | None = None,
 ) -> discord.Embed:
     embed = discord.Embed(
         title="Unter Marktwert",
@@ -150,7 +152,7 @@ def bargains_embed(
             extra_lines
             or [
                 "Kein EA-Transfermarkt — keine einzelnen Snipes.",
-                "Vergleich: FUT.GG-Preis vs. andere Plattform bzw. letzter Scan.",
+                "Vergleich: FUT.GG-Preis vs. andere Plattform, letzter Scan oder Vorjahr.",
             ]
         ),
     )
@@ -162,6 +164,16 @@ def bargains_embed(
     embed.add_field(
         name="Unter dem letzten Marktpreis",
         value=_bargain_list(market_deals) or "Keine",
+        inline=False,
+    )
+    year_label = (
+        f"Günstiger als FC {previous_game_year}"
+        if previous_game_year
+        else "Günstiger als letztes Jahr"
+    )
+    embed.add_field(
+        name=year_label,
+        value=_bargain_list(year_deals or []) or "Keine",
         inline=False,
     )
     embed.set_footer(text=FOOTER)
@@ -249,6 +261,8 @@ def format_bargain_line(deal: Bargain) -> str:
     )
     if deal.reason == "plattform":
         return f"**{bargain_display_name(deal)}** {path} · günstig auf {cheap_label} (vs {fair_label})"
+    if deal.reason == "vorjahr":
+        return f"**{bargain_display_name(deal)}** {path} · vs letztes Jahr ({fair_label})"
     return f"**{bargain_display_name(deal)}** {path}"
 
 

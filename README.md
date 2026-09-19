@@ -45,7 +45,7 @@ Ausführlich in Discord: **`/einrichten`**. Alle Befehle: **`/hilfe`**. Datensch
 | `/beobachtungen` | Nur Zielpreis-Beobachtungen |
 | `/alert` | Alert jetzt senden |
 | `/markt` | Momentum der letzten Stunden |
-| `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan) |
+| `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan / Vorjahr) |
 | `/hilfe` | Kurzanleitung |
 | `/datenschutz` | Datenschutzerklärung |
 

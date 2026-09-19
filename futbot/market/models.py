@@ -5,7 +5,7 @@ from typing import Literal
 
 Platform = Literal["ps5", "pc"]
 WatchPlatform = Literal["ps5", "pc", "beide"]
-BargainReason = Literal["plattform", "markt"]
+BargainReason = Literal["plattform", "markt", "vorjahr"]
 
 STATUS_ON_MARKET = 0
 STATUS_SBC = 1

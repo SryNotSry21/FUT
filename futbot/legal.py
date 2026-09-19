@@ -119,7 +119,7 @@ def setup_guide_embed() -> discord.Embed:
         value=(
             "• `/watch` — Alert bei starker %-Änderung\n"
             "• `/beobachten unter:2000000` — Alert, wenn der Preis unter deinen Zielwert fällt\n"
-            "• `/schnappchen` — aktuell günstiger als die andere Plattform"
+            "• `/schnappchen` — günstiger als die andere Plattform, der letzte Scan oder der Vorjahrespreis"
         ),
         inline=False,
     )

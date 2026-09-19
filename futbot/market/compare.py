@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from futbot.market.models import Bargain, Platform
+from futbot.market.models import Bargain, PlayerCard, Platform
 
 
 def percent_change(old: int, new: int) -> float:
@@ -122,6 +122,67 @@ def rank_platform_bargains(
         )
     found.sort(key=lambda item: item.pct_below, reverse=True)
     return found[:limit]
+
+
+def rank_year_bargains(
+    current_ps5: dict[int, int],
+    current_pc: dict[int, int],
+    last_ps5: dict[int, int],
+    last_pc: dict[int, int],
+    *,
+    min_price: int = 15_000,
+    min_pct: float = 20.0,
+    min_delta: int = 20_000,
+    max_price: int = MAX_REALISTIC_BIN,
+    limit: int = 10,
+) -> list[Bargain]:
+    """Cards whose current BIN is well below last year's BIN for the same id."""
+    found: list[Bargain] = []
+    for ea_id in set(current_ps5) | set(current_pc):
+        last_options: list[tuple[Platform, int]] = []
+        if ea_id in last_ps5:
+            last_options.append(("ps5", last_ps5[ea_id]))
+        if ea_id in last_pc:
+            last_options.append(("pc", last_pc[ea_id]))
+        if not last_options:
+            continue
+        fair_platform, fair_price = max(last_options, key=lambda item: item[1])
+        now_options: list[tuple[Platform, int]] = []
+        if ea_id in current_ps5:
+            now_options.append(("ps5", current_ps5[ea_id]))
+        if ea_id in current_pc:
+            now_options.append(("pc", current_pc[ea_id]))
+        if not now_options:
+            continue
+        cheap_platform, cheap_price = min(now_options, key=lambda item: item[1])
+        if cheap_price < min_price or fair_price < min_price or fair_price > max_price:
+            continue
+        if cheap_price <= 0 or fair_price <= 0 or cheap_price >= fair_price:
+            continue
+        delta = fair_price - cheap_price
+        pct_below = (delta / fair_price) * 100.0
+        if pct_below < min_pct or delta < min_delta:
+            continue
+        found.append(
+            Bargain(
+                ea_id=ea_id,
+                cheap_platform=cheap_platform,
+                cheap_price=cheap_price,
+                fair_platform=fair_platform,
+                fair_price=fair_price,
+                pct_below=pct_below,
+                reason="vorjahr",
+            )
+        )
+    found.sort(key=lambda item: item.pct_below, reverse=True)
+    return found[:limit]
+
+
+def is_same_player_card(current: PlayerCard, previous: PlayerCard | None) -> bool:
+    """Keep YoY bargains only when the reused card id is still the same player."""
+    if previous is None:
+        return current.base_player_ea_id == current.ea_id
+    return current.base_player_ea_id == previous.base_player_ea_id
 
 
 def bargains_from_drops(

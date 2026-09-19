@@ -71,7 +71,10 @@ class FutGGClient:
         found = await self.get_players([ea_id])
         return found.get(int(ea_id))
 
-    async def get_players(self, ea_ids: Sequence[int]) -> dict[int, PlayerCard]:
+    async def get_players(
+        self, ea_ids: Sequence[int], game_year: int | None = None
+    ) -> dict[int, PlayerCard]:
+        year = self.game_year if game_year is None else game_year
         wanted = list(dict.fromkeys(int(ea_id) for ea_id in ea_ids))
         found: dict[int, PlayerCard] = {}
         if not wanted:
@@ -82,7 +85,7 @@ class FutGGClient:
             ids = ",".join(str(ea_id) for ea_id in chunk)
             try:
                 payload = await self._get_json(
-                    f"{SITE}/api/fut/{self.game_year}/player-items/",
+                    f"{SITE}/api/fut/{year}/player-items/",
                     params={"ids": ids},
                 )
             except (httpx.HTTPError, ValueError):
@@ -93,17 +96,18 @@ class FutGGClient:
             for ea_id in chunk:
                 if ea_id in found:
                     continue
-                card = await self._lookup_single_player(ea_id)
+                card = await self._lookup_single_player(ea_id, year)
                 if card:
                     found[ea_id] = card
         return found
 
-    async def _lookup_single_player(self, ea_id: int) -> PlayerCard | None:
+    async def _lookup_single_player(self, ea_id: int, game_year: int | None = None) -> PlayerCard | None:
+        year = self.game_year if game_year is None else game_year
         for url, params in (
-            (f"{SITE}/api/fut/players/v2/hub/{ea_id}/", {"game": self.game_year}),
-            (f"{SITE}/api/fut/{self.game_year}/player-items/", {"ids": ea_id}),
-            (f"{SITE}/api/fut/players/v2/{self.game_year}/", {"ids": ea_id}),
-            (f"{SITE}/api/fut/players/v2/{self.game_year}/", {"eaId": ea_id}),
+            (f"{SITE}/api/fut/players/v2/hub/{ea_id}/", {"game": year}),
+            (f"{SITE}/api/fut/{year}/player-items/", {"ids": ea_id}),
+            (f"{SITE}/api/fut/players/v2/{year}/", {"ids": ea_id}),
+            (f"{SITE}/api/fut/players/v2/{year}/", {"eaId": ea_id}),
         ):
             try:
                 payload = await self._get_json(url, params=params)
@@ -122,43 +126,49 @@ class FutGGClient:
         return [parse_player_card(item) for item in payload.get("data") or []]
 
     async def fetch_catalog(self) -> PriceCatalog:
-        index = await self._load_blob("player-prices-index")
-        ps5_blob = await self._load_price_side("ps5", index)
-        pc_blob = await self._load_price_side("pc", index)
+        return await self.fetch_catalog_year(self.game_year)
+
+    async def fetch_catalog_year(self, game_year: int) -> PriceCatalog:
+        index = await self._load_blob("player-prices-index", game_year)
+        ps5_blob = await self._load_price_side("ps5", index, game_year)
+        pc_blob = await self._load_price_side("pc", index, game_year)
         return PriceCatalog(
-            game_year=self.game_year,
+            game_year=game_year,
             ps5=decode_platform_prices(ps5_blob, "ps5"),
             pc=decode_platform_prices(pc_blob, "pc"),
         )
 
-    async def _load_price_side(self, platform: str, index: dict[str, Any]) -> dict[str, Any]:
+    async def _load_price_side(
+        self, platform: str, index: dict[str, Any], game_year: int
+    ) -> dict[str, Any]:
         dyn_name = f"player-prices-{'pc' if platform == 'pc' else 'ps5'}-dyn"
         static_name = f"player-prices-{'pc' if platform == 'pc' else 'ps5'}"
         try:
-            dyn = await self._load_blob(dyn_name)
+            dyn = await self._load_blob(dyn_name, game_year)
             merged = merge_price_blobs(index, dyn)
             if len(merged.get("p") or []) == reconstruct_len(index):
                 return merged
         except Exception:
             logger.warning("Dyn price blob %s failed, falling back to static", dyn_name, exc_info=True)
-        static = await self._load_blob(static_name)
+        static = await self._load_blob(static_name, game_year)
         if "p" in static and "d" in static:
             return static
         return merge_price_blobs(index, static)
 
-    async def _load_blob(self, name: str) -> dict[str, Any]:
-        s3_url = f"{CDN_S3}/{self.game_year}/cdn-data/{name}.json"
+    async def _load_blob(self, name: str, game_year: int | None = None) -> dict[str, Any]:
+        year = self.game_year if game_year is None else game_year
+        s3_url = f"{CDN_S3}/{year}/cdn-data/{name}.json"
         try:
             return await self._get_json(s3_url)
         except httpx.HTTPError:
             logger.info("S3 miss for %s, trying R2 manifest", name)
-        manifest = await self._get_json(f"{CDN_R2}/{self.game_year}/manifest.json")
+        manifest = await self._get_json(f"{CDN_R2}/{year}/manifest.json")
         version = manifest.get("_version", 1)
         digest = manifest.get(name)
         if not digest:
             raise LookupError(f"Manifest has no entry for {name}")
         return await self._get_json(
-            f"{CDN_R2}/{self.game_year}/{name}.v{version}.{digest}.json"
+            f"{CDN_R2}/{year}/{name}.v{version}.{digest}.json"
         )
 
     async def _get_json(self, url: str, params: dict[str, Any] | None = None) -> dict[str, Any]:

@@ -545,7 +545,7 @@ class MarketCog(commands.Cog):
 
     @app_commands.command(
         name="schnappchen",
-        description="Karten unter Marktwert: günstiger als die andere Plattform oder unter dem letzten Preis",
+        description="Karten unter Marktwert: andere Plattform, letzter Scan oder Vorjahrespreis",
     )
     @app_commands.describe(
         min_prozent="Mindest-Abstand zum Vergleichspreis",
@@ -571,15 +571,23 @@ class MarketCog(commands.Cog):
             min_pct=float(min_prozent),
             limit=8,
         )
+        year_deals = await self.market.year_bargains(
+            min_price=int(min_preis),
+            min_pct=float(min_prozent),
+            limit=8,
+        )
+        previous_year = self.market.game_year - 1
         await interaction.followup.send(
             embed=bargains_embed(
                 platform_deals,
                 market_deals,
                 extra_lines=[
                     "Kein EA-Transfermarkt — einzelne unter Preis gelistete Auktionen sieht der Bot nicht.",
-                    "Vergleich: FUT.GG-BIN vs. andere Plattform bzw. letzter Scan.",
+                    "Vergleich: FUT.GG-BIN vs. andere Plattform, letzter Scan oder Vorjahr.",
                     f"Schwelle {format_pct(float(min_prozent))} · ab {format_coins(int(min_preis))}",
                 ],
+                year_deals=year_deals,
+                previous_game_year=previous_year,
             )
         )
 
@@ -642,7 +650,7 @@ class MarketCog(commands.Cog):
                 "`/beobachtungen` Beobachtungsliste (Zielpreis)\n"
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
-                "`/schnappchen` unter Marktwert / günstige Plattform\n"
+                "`/schnappchen` unter Marktwert / Plattform / Vorjahr\n"
                 "`/datenschutz` Datenschutzerklärung"
             ),
             inline=False,

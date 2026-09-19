@@ -98,6 +98,22 @@ async def test_live_platform_bargains_have_names() -> None:
 
 
 @pytest.mark.asyncio
+async def test_live_year_bargains_use_previous_season() -> None:
+    market = MarketService(game_year=27)
+    try:
+        deals = await market.year_bargains(min_price=15_000, min_pct=20, limit=5)
+    except Exception as exc:
+        pytest.skip(f"FUT.GG not reachable: {exc}")
+    finally:
+        await market.aclose()
+    if not deals:
+        pytest.skip("no year-over-year bargains at the current thresholds")
+    assert all(deal.reason == "vorjahr" for deal in deals)
+    assert all(deal.player and deal.player.name != "Unbekannt" for deal in deals)
+    assert all(deal.cheap_price < deal.fair_price for deal in deals)
+
+
+@pytest.mark.asyncio
 async def test_live_momentum_contains_prices() -> None:
     client = FutGGClient(game_year=27)
     try:

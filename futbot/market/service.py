@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections.abc import Sequence
 from dataclasses import replace
@@ -8,13 +9,18 @@ from dataclasses import replace
 from futbot.market.compare import (
     bargains_from_drops,
     crossed_below_target,
+    is_same_player_card,
     is_significant_move,
     percent_change,
     rank_movers,
     rank_platform_bargains,
+    rank_year_bargains,
 )
 from futbot.market.futgg import FutGGClient
 from futbot.market.models import Bargain, PlayerCard, PlayerQuote, Platform, PriceCatalog, PriceMove
+
+logger = logging.getLogger(__name__)
+PREVIOUS_YEAR_CACHE_TTL = 600.0
 
 
 class MarketService:
@@ -24,6 +30,8 @@ class MarketService:
         self.futgg = FutGGClient(game_year=game_year)
         self._catalog: PriceCatalog | None = None
         self._catalog_loaded_at = 0.0
+        self._prev_catalog: PriceCatalog | None = None
+        self._prev_catalog_loaded_at = 0.0
         self._players: dict[int, PlayerCard] = {}
         self._lock = asyncio.Lock()
 
@@ -92,6 +100,27 @@ class MarketService:
             self._catalog = await self.futgg.fetch_catalog()
             self._catalog_loaded_at = now
             return self._catalog
+
+    async def previous_catalog(self, force: bool = False) -> PriceCatalog | None:
+        previous_year = self.game_year - 1
+        if previous_year < 15:
+            return None
+        async with self._lock:
+            now = time.monotonic()
+            ttl = max(self.cache_ttl, PREVIOUS_YEAR_CACHE_TTL)
+            if (
+                not force
+                and self._prev_catalog is not None
+                and now - self._prev_catalog_loaded_at < ttl
+            ):
+                return self._prev_catalog
+            try:
+                self._prev_catalog = await self.futgg.fetch_catalog_year(previous_year)
+            except Exception:
+                logger.warning("Previous-year FC %s catalog failed", previous_year, exc_info=True)
+                return self._prev_catalog
+            self._prev_catalog_loaded_at = now
+            return self._prev_catalog
 
     async def quote(self, query: str) -> PlayerQuote | None:
         player = await self.resolve(query)
@@ -188,6 +217,46 @@ class MarketService:
         )
         await self.hydrate_bargains(deals)
         return deals
+
+    async def year_bargains(
+        self,
+        min_price: int = 15_000,
+        min_pct: float = 20.0,
+        limit: int = 8,
+    ) -> list[Bargain]:
+        previous = await self.previous_catalog()
+        if previous is None:
+            return []
+        catalog = await self.catalog()
+        deals = rank_year_bargains(
+            catalog.snapshot("ps5"),
+            catalog.snapshot("pc"),
+            previous.snapshot("ps5"),
+            previous.snapshot("pc"),
+            min_price=min_price,
+            min_pct=min_pct,
+            limit=max(limit * 4, 16),
+        )
+        if not deals:
+            return []
+        ids = [deal.ea_id for deal in deals]
+        current_cards = await self.players_by_ids(ids)
+        try:
+            previous_cards = await self.futgg.get_players(ids, game_year=previous.game_year)
+        except Exception:
+            logger.warning("Previous-year player lookup failed", exc_info=True)
+            previous_cards = {}
+        kept: list[Bargain] = []
+        for deal in deals:
+            current = current_cards.get(deal.ea_id)
+            if current is None:
+                continue
+            if not is_same_player_card(current, previous_cards.get(deal.ea_id)):
+                continue
+            kept.append(replace(deal, player=current))
+            if len(kept) >= limit:
+                break
+        return kept
 
     async def below_recent_bargains(
         self,
