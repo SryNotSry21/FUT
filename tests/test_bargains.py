@@ -86,16 +86,16 @@ def test_bargain_line_shows_fair_to_cheap_not_delta() -> None:
         ea_id=1,
         cheap_platform="ps5",
         cheap_price=215_000,
-        fair_platform="pc",
+        fair_platform="ps5",
         fair_price=1_000_000,
         pct_below=78.5,
-        reason="plattform",
+        reason="markt",
         player=card,
     )
     text = format_bargain_line(deal)
     assert "Laura Georges" in text
     assert "1.000.000 → 215.000 Coins" in text
-    assert "günstig auf PS" in text
+    assert "PC" not in text
     assert "785.000" not in text
 
 
@@ -157,7 +157,8 @@ def test_year_bargain_line_and_embed_mention_last_year() -> None:
     assert "Mohamed Salah" in text
     assert "610.000 → 150.000 Coins" in text
     assert "vs letztes Jahr" in text
-    embed = bargains_embed([], [], year_deals=[deal], previous_game_year=26)
+    embed = bargains_embed([], year_deals=[deal], previous_game_year=26)
     names = [field.name for field in embed.fields]
     assert "Günstiger als FC 26" in names
     assert "Mohamed Salah" in embed.fields[-1].value
+    assert "Günstiger als die andere Plattform" not in names

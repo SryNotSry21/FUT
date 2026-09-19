@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Literal
 
 import discord
 from discord import app_commands
@@ -22,7 +21,7 @@ from futbot.formatting import (
     search_embed,
 )
 from futbot.legal import privacy_embed, setup_guide_embed
-from futbot.market.models import PlayerCard, Platform, PriceMove, WatchPlatform
+from futbot.market.models import PlayerCard, Platform, PriceMove
 from futbot.market.service import MarketService
 from futbot.security import (
     CooldownMap,
@@ -33,8 +32,6 @@ from futbot.security import (
 )
 
 logger = logging.getLogger(__name__)
-
-PlatformChoice = Literal["ps5", "pc", "beide"]
 
 
 def _is_guild_manager(interaction: discord.Interaction) -> bool:
@@ -112,7 +109,7 @@ class MarketCog(commands.Cog):
             for card in cards[:20]
         ]
 
-    @app_commands.command(name="preis", description="Aktuellen EA-FC-27-Marktpreis einer Karte anzeigen")
+    @app_commands.command(name="preis", description="Aktuellen PlayStation-Marktpreis einer FC-27-Karte anzeigen")
     @app_commands.describe(spieler="Name oder ausgewählte Karte")
     @app_commands.autocomplete(spieler=_autocomplete_player)
     async def preis(self, interaction: discord.Interaction, spieler: str) -> None:
@@ -144,7 +141,7 @@ class MarketCog(commands.Cog):
         cards = await self.market.search(spieler, limit=10)
         await interaction.followup.send(embed=search_embed(spieler, cards))
 
-    @app_commands.command(name="vergleichen", description="Zwei FC-27-Kartenpreise vergleichen")
+    @app_commands.command(name="vergleichen", description="Zwei PlayStation-Kartenpreise vergleichen")
     @app_commands.describe(spieler1="Erste Karte", spieler2="Zweite Karte")
     @app_commands.autocomplete(spieler1=_autocomplete_player, spieler2=_autocomplete_player)
     async def vergleichen(
@@ -161,21 +158,19 @@ class MarketCog(commands.Cog):
 
     @app_commands.command(
         name="watch",
-        description="Manuellen Preis-Alert für eine bestimmte Karte setzen",
+        description="Manuellen PlayStation-Preis-Alert für eine bestimmte Karte setzen",
     )
     @app_commands.describe(
         spieler="Karte, die überwacht werden soll",
-        plattform="Welche Preise auslösen",
         schwelle_prozent="Prozentuale Änderung (Standard: Server-Wert)",
         schwelle_coins="Optional: absolute Coin-Änderung",
-        unter="Optional: Alert, wenn der Preis unter diesen Wert fällt",
+        unter="Optional: Alert, wenn der PlayStation-Preis unter diesen Wert fällt",
     )
     @app_commands.autocomplete(spieler=_autocomplete_player)
     async def watch(
         self,
         interaction: discord.Interaction,
         spieler: str,
-        plattform: PlatformChoice = "beide",
         schwelle_prozent: app_commands.Range[float, 1, 90] | None = None,
         schwelle_coins: app_commands.Range[int, 100, 10_000_000] | None = None,
         unter: app_commands.Range[int, 500, 15_000_000] | None = None,
@@ -198,21 +193,20 @@ class MarketCog(commands.Cog):
                 guild_id=interaction.guild.id,  # type: ignore[union-attr]
                 user_id=inter.user.id,
                 player=card,
-                platform=plattform,
+                platform="ps5",
                 threshold_pct=float(threshold),
                 threshold_coins=int(schwelle_coins) if schwelle_coins else None,
                 target_below=int(unter) if unter else (existing.target_below if existing else None),
             )
             self.store.update_watch_prices(
-                watch.id, quote.ps5.price, quote.pc.price, alerted=False
+                watch.id, quote.ps5.price, None, alerted=False
             )
             text = (
-                f"Alert für **{card.label}** ist aktiv.\n"
+                f"Alert für **{card.label}** ist aktiv (PlayStation).\n"
                 f"Schwelle: {format_pct(float(threshold))}"
                 + (f" oder {format_coins(int(schwelle_coins))}" if schwelle_coins else "")
                 + (f"\nUnter: {format_coins(watch.target_below)}" if watch.target_below else "")
-                + f"\nPlattform: {plattform}\n"
-                f"Aktuell PS {format_coins(quote.ps5.price)} · PC {format_coins(quote.pc.price)}"
+                + f"\nAktuell {format_coins(quote.ps5.price)}"
             )
             if inter.response.is_done():
                 await inter.followup.send(text, embed=player_embed(quote, title="Watch gesetzt"))
@@ -235,12 +229,11 @@ class MarketCog(commands.Cog):
 
     @app_commands.command(
         name="beobachten",
-        description="Beobachtungsliste: Alert, wenn der Preis unter einen Zielwert fällt",
+        description="Beobachtungsliste: Alert, wenn der PlayStation-Preis unter einen Zielwert fällt",
     )
     @app_commands.describe(
         spieler="Karte",
-        unter="Alert, sobald der Preis diesen Wert erreicht oder unterschreitet",
-        plattform="Welche Preise geprüft werden",
+        unter="Alert, sobald der PlayStation-Preis diesen Wert erreicht oder unterschreitet",
     )
     @app_commands.autocomplete(spieler=_autocomplete_player)
     async def beobachten(
@@ -248,7 +241,6 @@ class MarketCog(commands.Cog):
         interaction: discord.Interaction,
         spieler: str,
         unter: app_commands.Range[int, 500, 15_000_000],
-        plattform: PlatformChoice = "beide",
     ) -> None:
         if interaction.guild is None:
             await interaction.response.send_message("Nur auf einem Server nutzbar.", ephemeral=True)
@@ -267,24 +259,21 @@ class MarketCog(commands.Cog):
                 guild_id=interaction.guild.id,  # type: ignore[union-attr]
                 user_id=inter.user.id,
                 player=card,
-                platform=plattform,
+                platform="ps5",
                 threshold_pct=existing.threshold_pct if existing else 0.0,
                 threshold_coins=existing.threshold_coins if existing else None,
                 target_below=target,
             )
             self.store.update_watch_prices(
-                watch.id, quote.ps5.price, quote.pc.price, alerted=False
+                watch.id, quote.ps5.price, None, alerted=False
             )
             already = []
-            if plattform in ("ps5", "beide") and quote.ps5.price is not None and quote.ps5.price <= target:
-                already.append(f"PS {format_coins(quote.ps5.price)}")
-            if plattform in ("pc", "beide") and quote.pc.price is not None and quote.pc.price <= target:
-                already.append(f"PC {format_coins(quote.pc.price)}")
+            if quote.ps5.price is not None and quote.ps5.price <= target:
+                already.append(format_coins(quote.ps5.price))
             text = (
-                f"**{card.label}** steht auf der Beobachtungsliste.\n"
+                f"**{card.label}** steht auf der Beobachtungsliste (PlayStation).\n"
                 f"Alert, wenn der Preis **unter {format_coins(target)}** fällt.\n"
-                f"Plattform: {plattform}\n"
-                f"Aktuell PS {format_coins(quote.ps5.price)} · PC {format_coins(quote.pc.price)}"
+                f"Aktuell {format_coins(quote.ps5.price)}"
             )
             if already:
                 text += (
@@ -379,7 +368,7 @@ class MarketCog(commands.Cog):
         for watch in watches:
             owner = f" · <@{watch.user_id}>" if manager else ""
             lines.append(
-                f"• **{watch.name}** {watch.rating} {watch.position} · {watch.platform} · "
+                f"• **{watch.name}** {watch.rating} {watch.position} · "
                 + (
                     f"unter {format_coins(watch.target_below)}"
                     if watch.target_below
@@ -391,7 +380,7 @@ class MarketCog(commands.Cog):
                     else ""
                 )
                 + (f" / {format_coins(watch.threshold_coins)}" if watch.threshold_coins else "")
-                + f" · PS {format_coins(watch.last_price_ps5)} · PC {format_coins(watch.last_price_pc)}"
+                + f" · {format_coins(watch.last_price_ps5)}"
                 + owner
             )
         embed = discord.Embed(title="Manuelle Alerts", description="\n".join(lines), color=0x2ECC71)
@@ -423,9 +412,9 @@ class MarketCog(commands.Cog):
         for watch in watches:
             owner = f" · <@{watch.user_id}>" if manager else ""
             lines.append(
-                f"• **{watch.name}** {watch.rating} {watch.position} · {watch.platform} · "
+                f"• **{watch.name}** {watch.rating} {watch.position} · "
                 f"Alert unter {format_coins(watch.target_below)}"
-                f" · PS {format_coins(watch.last_price_ps5)} · PC {format_coins(watch.last_price_pc)}"
+                f" · {format_coins(watch.last_price_ps5)}"
                 + owner
             )
         embed = discord.Embed(
@@ -505,7 +494,7 @@ class MarketCog(commands.Cog):
             self._alert_cooldown.hit(interaction.user.id)
             await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="markt", description="Aktuelle starke Marktbewegungen (FUT.GG Momentum)")
+    @app_commands.command(name="markt", description="Aktuelle starke PlayStation-Marktbewegungen (FUT.GG Momentum)")
     @app_commands.describe(stunden="Zeitfenster in Stunden")
     async def markt(
         self,
@@ -539,13 +528,13 @@ class MarketCog(commands.Cog):
                 f"Markt-Momentum ({stunden}h)",
                 fake_moves[:8],
                 drops[:8],
-                extra_lines=["Quelle: FUT.GG Momentum-API, angereichert mit Live-Preisblob."],
+                extra_lines=["PlayStation · Quelle: FUT.GG Momentum-API, angereichert mit Live-Preisblob."],
             )
             )
 
     @app_commands.command(
         name="schnappchen",
-        description="Karten unter Marktwert: andere Plattform, letzter Scan oder Vorjahrespreis",
+        description="PlayStation-Karten unter Marktwert: letzter Scan oder Vorjahrespreis",
     )
     @app_commands.describe(
         min_prozent="Mindest-Abstand zum Vergleichspreis",
@@ -558,11 +547,6 @@ class MarketCog(commands.Cog):
         min_preis: app_commands.Range[int, 1000, 500_000] = 15_000,
     ) -> None:
         await interaction.response.defer()
-        platform_deals = await self.market.platform_bargains(
-            min_price=int(min_preis),
-            min_pct=float(min_prozent),
-            limit=8,
-        )
         previous = self.store.load_snapshot("ps5")
         market_deals = await self.market.below_recent_bargains(
             previous,
@@ -579,11 +563,10 @@ class MarketCog(commands.Cog):
         previous_year = self.market.game_year - 1
         await interaction.followup.send(
             embed=bargains_embed(
-                platform_deals,
                 market_deals,
                 extra_lines=[
-                    "Kein EA-Transfermarkt — einzelne unter Preis gelistete Auktionen sieht der Bot nicht.",
-                    "Vergleich: FUT.GG-BIN vs. andere Plattform, letzter Scan oder Vorjahr.",
+                    "Nur PlayStation-Preise. Kein EA-Transfermarkt — einzelne Auktionen sieht der Bot nicht.",
+                    "Vergleich: letzter PS-Scan oder Vorjahres-PlayStation-Preis.",
                     f"Schwelle {format_pct(float(min_prozent))} · ab {format_coins(int(min_preis))}",
                 ],
                 year_deals=year_deals,
@@ -615,9 +598,10 @@ class MarketCog(commands.Cog):
         settings.default_threshold_pct = float(schwelle)
         settings.scan_enabled = auto_scan
         settings.scan_min_price = int(min_preis)
+        settings.scan_platform = "ps5"
         self.store.upsert_guild(settings)
         await interaction.response.send_message(
-            f"Alerts gehen nach {kanal.mention}.\n"
+            f"Alerts gehen nach {kanal.mention} (PlayStation).\n"
             f"Auto-Scan: {'an' if auto_scan else 'aus'} ab {format_coins(int(min_preis))}, "
             f"Schwelle {format_pct(float(schwelle))}."
         )
@@ -628,7 +612,7 @@ class MarketCog(commands.Cog):
             title=HELP_TITLE,
             color=0x2ECC71,
             description=(
-                "Der Bot zeigt Live-Preise zu EA FC 27 Ultimate Team und sendet Alerts "
+                "Der Bot zeigt Live-PlayStation-Preise zu EA FC 27 Ultimate Team und sendet Alerts "
                 "bei starken Marktbewegungen.\n\n"
                 "**Einrichten:** `/einrichten` — Bot einladen, Kanal wählen, `/setup`.\n"
                 "**Automatisch:** Nach `/setup` scannt der Bot den Markt im Hintergrund.\n"
@@ -650,7 +634,7 @@ class MarketCog(commands.Cog):
                 "`/beobachtungen` Beobachtungsliste (Zielpreis)\n"
                 "`/alert` Alert jetzt senden\n"
                 "`/markt` Momentum / Top-Mover\n"
-                "`/schnappchen` unter Marktwert / Plattform / Vorjahr\n"
+                "`/schnappchen` PlayStation unter Marktwert / Vorjahr\n"
                 "`/datenschutz` Datenschutzerklärung"
             ),
             inline=False,
@@ -710,7 +694,7 @@ class MarketCog(commands.Cog):
                 continue
             settings = self.store.get_guild(watch.guild_id)
             quote = catalog.quote(watch.as_player())
-            tagged = self._watch_moves(watch, quote.ps5.price, quote.pc.price, settings.cooldown_minutes, now)
+            tagged = self._watch_moves(watch, quote.ps5.price, settings.cooldown_minutes, now)
             if tagged:
                 moves = [move for move, _reason in tagged]
                 await self._hydrate_moves(moves)
@@ -725,7 +709,7 @@ class MarketCog(commands.Cog):
                             )
                         )
             self.store.update_watch_prices(
-                watch.id, quote.ps5.price, quote.pc.price, alerted=bool(tagged)
+                watch.id, quote.ps5.price, None, alerted=bool(tagged)
             )
 
         for settings in self.store.all_guilds_with_alerts():
@@ -734,12 +718,12 @@ class MarketCog(commands.Cog):
             guild = guilds.get(settings.guild_id)
             if guild is None:
                 continue
-            previous = self.store.load_snapshot(settings.scan_platform)
-            current = catalog.snapshot(settings.scan_platform)
+            previous = self.store.load_snapshot("ps5")
+            current = catalog.snapshot("ps5")
             if previous:
                 risers, fallers = await self.market.scan_snapshot_moves(
                     previous,
-                    settings.scan_platform,
+                    "ps5",
                     threshold_pct=settings.default_threshold_pct,
                     min_price=settings.scan_min_price,
                     limit=8,
@@ -760,30 +744,24 @@ class MarketCog(commands.Cog):
                                     auto_fallers,
                                     extra_lines=[
                                         f"Schwelle {format_pct(settings.default_threshold_pct)} · "
-                                        f"ab {format_coins(settings.scan_min_price)} · "
-                                        f"{settings.scan_platform.upper()}"
+                                        f"ab {format_coins(settings.scan_min_price)} · PlayStation"
                                     ],
                                 )
                             )
-            self.store.save_snapshot(settings.scan_platform, current)
+            self.store.save_snapshot("ps5", current)
 
-        # Keep a global snapshot even without guild scan so first /alert has a baseline.
         self.store.save_snapshot("ps5", catalog.snapshot("ps5"))
-        self.store.save_snapshot("pc", catalog.snapshot("pc"))
 
     def _watch_moves(
         self,
         watch: Watch,
         ps5_price: int | None,
-        pc_price: int | None,
         cooldown_minutes: int,
         now: float,
     ) -> list[tuple[PriceMove, str]]:
-        platforms: list[tuple[Platform, int | None, int | None]] = []
-        if watch.platform in ("ps5", "beide"):
-            platforms.append(("ps5", watch.last_price_ps5, ps5_price))
-        if watch.platform in ("pc", "beide"):
-            platforms.append(("pc", watch.last_price_pc, pc_price))
+        platforms: list[tuple[Platform, int | None, int | None]] = [
+            ("ps5", watch.last_price_ps5, ps5_price)
+        ]
         stored = watch.as_player()
         player = None if not watch.name or watch.name in {"Unbekannt", str(watch.ea_id)} else stored
         results: list[tuple[PriceMove, str]] = []

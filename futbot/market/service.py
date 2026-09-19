@@ -230,9 +230,9 @@ class MarketService:
         catalog = await self.catalog()
         deals = rank_year_bargains(
             catalog.snapshot("ps5"),
-            catalog.snapshot("pc"),
+            {},
             previous.snapshot("ps5"),
-            previous.snapshot("pc"),
+            {},
             min_price=min_price,
             min_pct=min_pct,
             limit=max(limit * 4, 16),

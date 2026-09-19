@@ -12,9 +12,9 @@ Diese Bedingungen gelten für die Discord-Anwendung **EA FC 27 Markt-Bot von 21D
 
 ## 1. What the Bot does / Leistung
 
-The Bot shows unofficial **EA FC 27 Ultimate Team** market information in Discord: player search, PlayStation/console and PC prices, comparisons, and optional price-move alerts.
+The Bot shows unofficial **EA FC 27 Ultimate Team** PlayStation market information in Discord: player search, console prices, comparisons, and optional price-move alerts.
 
-Der Bot zeigt in Discord inoffizielle Marktinformationen zu **EA FC 27 Ultimate Team**: Spielersuche, Preise für PlayStation/Konsole und PC, Vergleiche und optionale Alerts bei Preisbewegungen.
+Der Bot zeigt in Discord inoffizielle **PlayStation**-Marktinformationen zu **EA FC 27 Ultimate Team**: Spielersuche, Konsolenpreise, Vergleiche und optionale Alerts bei Preisbewegungen.
 
 Market data is read from public third-party sources (currently [FUT.GG](https://www.fut.gg)). The Bot does **not** log into EA accounts, does **not** access the official EA transfer market, and does **not** buy, sell or list cards.
 

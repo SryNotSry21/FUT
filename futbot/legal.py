@@ -28,7 +28,7 @@ def privacy_embed() -> discord.Embed:
         value=(
             "• Discord-Nutzer-ID (Inhaber von `/watch` / `/beobachten`, Erwähnung beim Alert)\n"
             "• Server-ID und Alert-Kanal-ID (`/setup`)\n"
-            "• Watch-Einstellungen (Karten-ID, Name, Plattform, Schwelle, optional Zielpreis)\n"
+            "• Watch-Einstellungen (Karten-ID, Name, PlayStation-Preis, Schwelle, optional Zielpreis)\n"
             "• Markt-Preis-Snapshots ohne Nutzerbezug"
         ),
         inline=False,
@@ -119,7 +119,7 @@ def setup_guide_embed() -> discord.Embed:
         value=(
             "• `/watch` — Alert bei starker %-Änderung\n"
             "• `/beobachten unter:2000000` — Alert, wenn der Preis unter deinen Zielwert fällt\n"
-            "• `/schnappchen` — günstiger als die andere Plattform, der letzte Scan oder der Vorjahrespreis"
+            "• `/schnappchen` — günstiger als der letzte PlayStation-Scan oder der Vorjahrespreis"
         ),
         inline=False,
     )

@@ -26,7 +26,7 @@ Der Bot speichert nur, was für Slash-Befehle und Preis-Alerts nötig ist:
 | Discord-Nutzer-ID | Inhaber von `/watch` und `/beobachten`; Erwähnung (`@Nutzer`) beim Alert |
 | Discord-Server-ID | Einstellungen und Alerts auf diesen Server begrenzen |
 | Discord-Kanal-ID | Alert-Kanal aus `/setup` |
-| Beobachtungs- und Watch-Einstellungen | EA-Karten-ID, Spielername, Plattform, %-Schwelle, optional Zielpreis („unter X Coins“), letzte bekannte Preise |
+| Beobachtungs- und Watch-Einstellungen | EA-Karten-ID, Spielername, PlayStation-Preis, %-Schwelle, optional Zielpreis („unter X Coins“), letzter bekannter PS-Preis |
 | Markt-Preis-Snapshots | Aktuelle FUT.GG-Preise mit dem letzten Scan vergleichen (ohne Nutzerbezug) |
 
 Der Bot fordert **keinen** Message-Content-Intent an. Er speichert **keine** Discord-Nachrichtentexte, keine E-Mail-Adressen, keine IP-Adressen, keine Zahlungsdaten und **keine EA-Zugangsdaten**. Es gibt **keinen EA-Login**.

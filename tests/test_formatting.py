@@ -5,8 +5,9 @@ from futbot.formatting import (
     format_price_path,
     move_display_name,
     movers_embed,
+    player_embed,
 )
-from futbot.market.models import PlayerCard, PriceMove
+from futbot.market.models import PlayerCard, PlatformPrice, PlayerQuote, PriceMove
 
 
 def _card(**overrides) -> PlayerCard:
@@ -85,3 +86,19 @@ def test_move_list_shows_old_and_new_not_delta_as_start_price() -> None:
     assert "(-54,0 %)" in text
     assert "810.000" not in text
     assert format_price_path(move) == "▼ 1.500.000 → 690.000 Coins (-54,0 %)"
+
+
+def test_player_embed_is_playstation_only() -> None:
+    quote = PlayerQuote(
+        player=_card(),
+        ps5=PlatformPrice(platform="ps5", price=3_800_000),
+        pc=PlatformPrice(platform="pc", price=4_000_000),
+    )
+    embed = player_embed(quote)
+    names = [field.name for field in embed.fields]
+    values = " ".join(field.value for field in embed.fields)
+    assert names == ["PlayStation"]
+    assert "3.800.000" in values
+    assert "4.000.000" not in values
+    assert "PC" not in (embed.description or "")
+    assert "PlayStation" in (embed.description or "")

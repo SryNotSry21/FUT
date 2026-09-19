@@ -13,6 +13,10 @@ def test_invite_url_is_official_oauth() -> None:
     assert "discord.com/oauth2/authorize" in INVITE_URL
     assert "applications.commands" in INVITE_URL
     assert COPYRIGHT.startswith("© 2026 21Drehen")
+    from futbot.branding import BOT_ACTIVITY, FOOTER
+
+    assert "PlayStation" in BOT_ACTIVITY
+    assert "PlayStation" in FOOTER
 
 
 def test_readme_is_invite_setup_not_bot_creation() -> None:

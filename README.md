@@ -1,6 +1,6 @@
 # EA FC 27 Markt-Bot von 21Drehen
 
-Offizielle Discord-Anwendung von **21Drehen**. Der Bot prüft den EA-FC-27-Markt (Preise über FUT.GG), vergleicht sie und schickt Alerts bei starken Bewegungen.
+Offizielle Discord-Anwendung von **21Drehen**. Der Bot prüft den EA-FC-27-**PlayStation**-Markt (Preise über FUT.GG), vergleicht sie und schickt Alerts bei starken Bewegungen.
 
 Du musst **keinen eigenen Bot erstellen**. Einfach den offiziellen Bot einladen und auf dem Server einrichten.
 
@@ -35,9 +35,9 @@ Ausführlich in Discord: **`/einrichten`**. Alle Befehle: **`/hilfe`**. Datensch
 |---|---|
 | `/einrichten` | Setup-Erklärung für diesen Server |
 | `/setup` | Alert-Kanal, Auto-Scan und Schwelle (Admin) |
-| `/preis` | Aktuellen PS- und PC-Preis |
+| `/preis` | Aktuellen PlayStation-Preis |
 | `/suche` | Spieler suchen |
-| `/vergleichen` | Zwei Karten vergleichen |
+| `/vergleichen` | Zwei Karten vergleichen (PS) |
 | `/watch` | Alert bei %-Änderung |
 | `/beobachten` | Alert unter Zielpreis |
 | `/unwatch` | Alert entfernen |
@@ -45,7 +45,7 @@ Ausführlich in Discord: **`/einrichten`**. Alle Befehle: **`/hilfe`**. Datensch
 | `/beobachtungen` | Nur Zielpreis-Beobachtungen |
 | `/alert` | Alert jetzt senden |
 | `/markt` | Momentum der letzten Stunden |
-| `/schnappchen` | Unter Marktwert (PS vs PC / letzter Scan / Vorjahr) |
+| `/schnappchen` | Unter Marktwert (letzter PS-Scan / Vorjahr) |
 | `/hilfe` | Kurzanleitung |
 | `/datenschutz` | Datenschutzerklärung |
 
